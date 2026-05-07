@@ -1,0 +1,82 @@
+import { useState } from "react";
+import { LayoutDashboard, ScanBarcode, Package, Truck, FileBarChart, History } from "lucide-react";
+import Frame8 from "../../imports/Frame8/Frame8";
+
+export type View = "dashboard" | "pos" | "inventory" | "po" | "reports" | "history";
+
+export const navItems: { key: View; label: string; icon: typeof LayoutDashboard }[] = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "pos", label: "Point of Sale", icon: ScanBarcode },
+  { key: "inventory", label: "Inventory", icon: Package },
+  { key: "po", label: "Purchase Orders", icon: Truck },
+  { key: "history", label: "History", icon: History },
+  { key: "reports", label: "Reports", icon: FileBarChart },
+];
+
+export function Sidebar({ view, setView }: { view: View; setView: (v: View) => void }) {
+  const [hover, setHover] = useState(false);
+  const expanded = hover;
+  const width = expanded ? 280 : 84;
+  const easing = "cubic-bezier(0.32, 0.72, 0, 1)";
+
+  return (
+    <div
+      className="hidden md:block shrink-0 sticky top-0 h-screen p-3"
+      style={{ width, transition: `width 420ms ${easing}` }}
+    >
+      <aside
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        className="h-full rounded-[28px] bg-white/70 backdrop-blur-2xl border border-black/5 flex flex-col overflow-hidden"
+      >
+        <div className={`flex items-center pt-5 pb-4 ${expanded ? "px-5 gap-3" : "px-0 justify-center"}`}>
+          <div className="size-11 shrink-0 grid place-items-center">
+            <Frame8 />
+          </div>
+          <div
+            className="overflow-hidden"
+            style={{
+              opacity: expanded ? 1 : 0,
+              width: expanded ? "auto" : 0,
+              transition: `opacity 320ms ${easing} ${expanded ? "120ms" : "0ms"}, width 420ms ${easing}`,
+            }}
+          >
+            <p className="whitespace-nowrap tracking-tight" style={{ fontWeight: 590 }}>XYZ Supermarket</p>
+          </div>
+        </div>
+
+        <nav className={`mt-2 space-y-2 flex-1 ${expanded ? "px-3" : "px-0"}`}>
+          {navItems.map((n) => {
+            const active = view === n.key;
+            return (
+              <button
+                key={n.key}
+                onClick={() => setView(n.key)}
+                className={`flex items-center rounded-full ${
+                  expanded ? "w-full gap-3 px-5 h-11 justify-start" : "size-11 mx-auto justify-center"
+                } ${active ? "bg-[#08f] text-white" : "text-[#1a1a1a] hover:bg-black/5"}`}
+                style={{ transition: `background-color 220ms ${easing}, color 220ms ${easing}, padding 420ms ${easing}` }}
+              >
+                <n.icon className="size-5 shrink-0" strokeWidth={active ? 2.4 : 2} />
+                <span
+                  className="whitespace-nowrap overflow-hidden"
+                  style={{
+                    opacity: expanded ? 1 : 0,
+                    width: expanded ? "auto" : 0,
+                    fontSize: 15,
+                    fontWeight: 510,
+                    transition: `opacity 320ms ${easing} ${expanded ? "120ms" : "0ms"}, width 420ms ${easing}`,
+                  }}
+                >
+                  {n.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="pb-4" />
+      </aside>
+    </div>
+  );
+}
