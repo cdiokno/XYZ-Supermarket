@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -9,26 +9,48 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "./ui/label";
 import { Product, PurchaseOrder } from "./store-data";
 import { getStoreErrorMessage } from "../lib/store-api";
-import { Plus, Check } from "lucide-react";
+import { Plus, Check, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
+const UNDO_WINDOW_MS = 3000;
 
 export function PurchaseOrders({
   products,
   pos,
   onCreatePO,
   receivePO,
+  undoReceivePO,
 }: {
   products: Product[];
   pos: PurchaseOrder[];
   onCreatePO: (po: PurchaseOrder) => Promise<void>;
   receivePO: (po: PurchaseOrder) => Promise<void>;
+  undoReceivePO: (po: PurchaseOrder) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ supplier: "", productId: products[0]?.id || "", qty: 0 });
   const [creating, setCreating] = useState(false);
   const [receivingId, setReceivingId] = useState<string | null>(null);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  const [undoWindows, setUndoWindows] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(Date.now());
 
   const lowStock = products.filter((p) => p.stock <= p.reorderLevel);
+
+  useEffect(() => {
+    const hasActiveUndo = Object.values(undoWindows).some((expiresAt) => expiresAt > Date.now());
+    if (!hasActiveUndo) return;
+
+    const intervalId = window.setInterval(() => {
+      const currentTime = Date.now();
+      setNow(currentTime);
+      setUndoWindows((current) =>
+        Object.fromEntries(Object.entries(current).filter(([, expiresAt]) => expiresAt > currentTime))
+      );
+    }, 100);
+
+    return () => window.clearInterval(intervalId);
+  }, [undoWindows]);
 
   const create = async () => {
     const product = products.find((p) => p.id === form.productId);
@@ -59,11 +81,31 @@ export function PurchaseOrders({
     setReceivingId(po.id);
     try {
       await receivePO(po);
+      const receivedAt = Date.now();
+      setNow(receivedAt);
+      setUndoWindows((current) => ({ ...current, [po.id]: receivedAt + UNDO_WINDOW_MS }));
       toast.success(`Received ${po.qty} × ${po.productName}`);
     } catch (error) {
       toast.error(getStoreErrorMessage(error));
     } finally {
       setReceivingId(null);
+    }
+  };
+
+  const undoReceive = async (po: PurchaseOrder) => {
+    setUndoingId(po.id);
+    try {
+      await undoReceivePO(po);
+      setUndoWindows((current) => {
+        const next = { ...current };
+        delete next[po.id];
+        return next;
+      });
+      toast.success(`Receipt undone for ${po.productName}`);
+    } catch (error) {
+      toast.error(getStoreErrorMessage(error));
+    } finally {
+      setUndoingId(null);
     }
   };
 
@@ -104,24 +146,45 @@ export function PurchaseOrders({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pos.map((po) => (
-                <TableRow key={po.id}>
-                  <TableCell>{new Date(po.date).toLocaleDateString()}</TableCell>
-                  <TableCell>{po.supplier}</TableCell>
-                  <TableCell>{po.productName}</TableCell>
-                  <TableCell className="text-right">{po.qty}</TableCell>
-                  <TableCell>
-                    {po.status === "Received" ? <Badge variant="secondary">Received</Badge> : <Badge>Pending</Badge>}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {po.status === "Pending" && (
-                      <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={receivingId === po.id}>
-                        <Check className="size-4 mr-1" /> Receive
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pos.map((po) => {
+                const undoExpiresAt = undoWindows[po.id] || 0;
+                const canUndo = po.status === "Received" && undoExpiresAt > now;
+                const remainingSeconds = Math.max(0, (undoExpiresAt - now) / 1000);
+
+                return (
+                  <TableRow key={po.id}>
+                    <TableCell>{new Date(po.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{po.supplier}</TableCell>
+                    <TableCell>{po.productName}</TableCell>
+                    <TableCell className="text-right">{po.qty}</TableCell>
+                    <TableCell>
+                      {po.status === "Received" ? <Badge variant="secondary">Received</Badge> : <Badge>Pending</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {po.status === "Pending" && (
+                        <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={receivingId === po.id}>
+                          <Check className="size-4 mr-1" /> Receive
+                        </Button>
+                      )}
+                      {canUndo && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => undoReceive(po)}
+                          disabled={undoingId === po.id}
+                          className="gap-1.5"
+                        >
+                          <RotateCcw className="size-4" />
+                          Undo
+                          <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
+                            {remainingSeconds.toFixed(1)}s
+                          </span>
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

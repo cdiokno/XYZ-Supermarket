@@ -17,6 +17,7 @@ import {
   getStoreErrorMessage,
   receivePurchaseOrder,
   saveProduct,
+  undoReceivePurchaseOrder,
   uploadProductImage,
 } from "./lib/store-api";
 import { hasSupabaseConfig } from "./lib/supabase";
@@ -82,7 +83,16 @@ export default function App() {
 
   const receivePO = async (po: PurchaseOrder) => {
     await receivePurchaseOrder(po.id);
-    await loadStore();
+    setPOs((current) => current.map((item) => (item.id === po.id ? { ...item, status: "Received" } : item)));
+    setProducts((current) => current.map((product) => (product.id === po.productId ? { ...product, stock: product.stock + po.qty } : product)));
+    void loadStore();
+  };
+
+  const undoReceivePO = async (po: PurchaseOrder) => {
+    await undoReceivePurchaseOrder(po.id);
+    setPOs((current) => current.map((item) => (item.id === po.id ? { ...item, status: "Pending" } : item)));
+    setProducts((current) => current.map((product) => (product.id === po.productId ? { ...product, stock: Math.max(0, product.stock - po.qty) } : product)));
+    void loadStore();
   };
 
   if (loading) {
@@ -124,7 +134,7 @@ export default function App() {
           {view === "dashboard" && <Dashboard products={products} sales={sales} />}
           {view === "pos" && <POS products={products} cashiers={cashiers} onAddCashier={handleAddCashier} onCheckout={handleCheckout} />}
           {view === "inventory" && <Inventory products={products} onSaveProduct={handleSaveProduct} onUploadImage={uploadProductImage} />}
-          {view === "po" && <PurchaseOrders products={products} pos={pos} onCreatePO={handleCreatePO} receivePO={receivePO} />}
+          {view === "po" && <PurchaseOrders products={products} pos={pos} onCreatePO={handleCreatePO} receivePO={receivePO} undoReceivePO={undoReceivePO} />}
           {view === "history" && <History sales={sales} />}
           {view === "reports" && <Reports sales={sales} products={products} />}
         </main>

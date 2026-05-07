@@ -185,6 +185,15 @@ export async function receivePurchaseOrder(id: string) {
   if (error) throw error;
 }
 
+export async function undoReceivePurchaseOrder(id: string) {
+  if (!hasSupabaseConfig) return;
+
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("undo_receive_purchase_order", { p_po_id: id });
+
+  if (error) throw error;
+}
+
 export async function uploadProductImage(file: File, productId: string) {
   if (!hasSupabaseConfig) {
     return new Promise<string>((resolve, reject) => {

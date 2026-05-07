@@ -160,6 +160,12 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
       };
+      undo_receive_purchase_order: {
+        Args: {
+          p_po_id: string;
+        };
+        Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
