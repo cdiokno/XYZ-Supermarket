@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Label } from "./ui/label";
 import { Product, PurchaseOrder } from "./store-data";
 import { getStoreErrorMessage } from "../lib/store-api";
-import { Plus, Check, RotateCcw } from "lucide-react";
+import { Plus, Check, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const UNDO_WINDOW_MS = 3000;
@@ -18,18 +18,21 @@ export function PurchaseOrders({
   products,
   pos,
   onCreatePO,
+  onDeletePO,
   receivePO,
   undoReceivePO,
 }: {
   products: Product[];
   pos: PurchaseOrder[];
   onCreatePO: (po: PurchaseOrder) => Promise<void>;
+  onDeletePO: (po: PurchaseOrder) => Promise<void>;
   receivePO: (po: PurchaseOrder) => Promise<void>;
   undoReceivePO: (po: PurchaseOrder) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ supplier: "", productId: products[0]?.id || "", qty: 0 });
   const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [receivingId, setReceivingId] = useState<string | null>(null);
   const [undoingId, setUndoingId] = useState<string | null>(null);
   const [undoWindows, setUndoWindows] = useState<Record<string, number>>({});
@@ -89,6 +92,27 @@ export function PurchaseOrders({
       toast.error(getStoreErrorMessage(error));
     } finally {
       setReceivingId(null);
+    }
+  };
+
+  const deletePO = async (po: PurchaseOrder) => {
+    const inventoryNote = po.status === "Received" ? " The received quantity will be removed from inventory." : "";
+    const confirmed = window.confirm(`Delete purchase order #${po.id.toUpperCase()} for ${po.productName}?${inventoryNote}`);
+    if (!confirmed) return;
+
+    setDeletingId(po.id);
+    try {
+      await onDeletePO(po);
+      setUndoWindows((current) => {
+        const next = { ...current };
+        delete next[po.id];
+        return next;
+      });
+      toast.success("Purchase order deleted");
+    } catch (error) {
+      toast.error(getStoreErrorMessage(error));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -161,26 +185,39 @@ export function PurchaseOrders({
                       {po.status === "Received" ? <Badge variant="secondary">Received</Badge> : <Badge>Pending</Badge>}
                     </TableCell>
                     <TableCell className="text-right">
-                      {po.status === "Pending" && (
-                        <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={receivingId === po.id}>
-                          <Check className="size-4 mr-1" /> Receive
-                        </Button>
-                      )}
-                      {canUndo && (
+                      <div className="flex justify-end gap-2">
+                        {po.status === "Pending" && (
+                          <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={receivingId === po.id || deletingId === po.id}>
+                            <Check className="size-4 mr-1" /> Receive
+                          </Button>
+                        )}
+                        {canUndo && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => undoReceive(po)}
+                            disabled={undoingId === po.id || deletingId === po.id}
+                            className="gap-1.5"
+                          >
+                            <RotateCcw className="size-4" />
+                            Undo
+                            <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
+                              {remainingSeconds.toFixed(1)}s
+                            </span>
+                          </Button>
+                        )}
                         <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => undoReceive(po)}
-                          disabled={undoingId === po.id}
-                          className="gap-1.5"
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`Delete purchase order #${po.id.toUpperCase()}`}
+                          title={`Delete purchase order #${po.id.toUpperCase()}`}
+                          className="size-8 rounded-full text-[#ff3b30] hover:bg-[#ff3b30]/10"
+                          onClick={() => deletePO(po)}
+                          disabled={deletingId === po.id || receivingId === po.id || undoingId === po.id}
                         >
-                          <RotateCcw className="size-4" />
-                          Undo
-                          <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">
-                            {remainingSeconds.toFixed(1)}s
-                          </span>
+                          <Trash2 className="size-4" />
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

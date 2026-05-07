@@ -169,6 +169,12 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["sales"]["Row"];
       };
+      delete_purchase_order: {
+        Args: {
+          p_po_id: string;
+        };
+        Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
+      };
       receive_purchase_order: {
         Args: {
           p_po_id: string;

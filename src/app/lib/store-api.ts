@@ -218,6 +218,15 @@ export async function createPurchaseOrder(po: PurchaseOrder) {
   return mapPurchaseOrder(data as PurchaseOrderRow);
 }
 
+export async function deletePurchaseOrder(id: string) {
+  if (!hasSupabaseConfig) return;
+
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("delete_purchase_order", { p_po_id: id });
+
+  if (error) throw error;
+}
+
 export async function receivePurchaseOrder(id: string) {
   if (!hasSupabaseConfig) return;
 

@@ -14,6 +14,7 @@ import {
   checkoutSale,
   createPurchaseOrder,
   deleteProduct,
+  deletePurchaseOrder,
   deleteSale,
   fetchStoreData,
   getStoreErrorMessage,
@@ -89,6 +90,17 @@ export default function App() {
     setPOs((current) => [saved, ...current]);
   };
 
+  const handleDeletePO = async (po: PurchaseOrder) => {
+    await deletePurchaseOrder(po.id);
+    setPOs((current) => current.filter((item) => item.id !== po.id));
+    if (po.status === "Received") {
+      setProducts((current) =>
+        current.map((product) => (product.id === po.productId ? { ...product, stock: Math.max(0, product.stock - po.qty) } : product))
+      );
+    }
+    void loadStore();
+  };
+
   const handleDeleteSale = async (sale: Sale) => {
     await deleteSale(sale.id);
     setSales((current) => current.filter((item) => item.id !== sale.id));
@@ -154,7 +166,7 @@ export default function App() {
           {view === "dashboard" && <Dashboard products={products} sales={sales} />}
           {view === "pos" && <POS products={products} cashiers={cashiers} onAddCashier={handleAddCashier} onCheckout={handleCheckout} />}
           {view === "inventory" && <Inventory products={products} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onUploadImage={uploadProductImage} />}
-          {view === "po" && <PurchaseOrders products={products} pos={pos} onCreatePO={handleCreatePO} receivePO={receivePO} undoReceivePO={undoReceivePO} />}
+          {view === "po" && <PurchaseOrders products={products} pos={pos} onCreatePO={handleCreatePO} onDeletePO={handleDeletePO} receivePO={receivePO} undoReceivePO={undoReceivePO} />}
           {view === "history" && <History sales={sales} onDeleteSale={handleDeleteSale} />}
           {view === "reports" && <Reports sales={sales} products={products} />}
         </main>
