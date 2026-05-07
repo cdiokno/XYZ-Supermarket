@@ -13,6 +13,8 @@ import {
   addCashier,
   checkoutSale,
   createPurchaseOrder,
+  deleteProduct,
+  deleteSale,
   fetchStoreData,
   getStoreErrorMessage,
   receivePurchaseOrder,
@@ -71,6 +73,12 @@ export default function App() {
     });
   };
 
+  const handleDeleteProduct = async (product: Product) => {
+    await deleteProduct(product.id);
+    setProducts((current) => current.filter((item) => item.id !== product.id));
+    void loadStore();
+  };
+
   const handleAddCashier = async (name: string) => {
     const saved = await addCashier(name);
     setCashiers((current) => (current.includes(saved) ? current : [...current, saved].sort()));
@@ -79,6 +87,18 @@ export default function App() {
   const handleCreatePO = async (po: PurchaseOrder) => {
     const saved = await createPurchaseOrder(po);
     setPOs((current) => [saved, ...current]);
+  };
+
+  const handleDeleteSale = async (sale: Sale) => {
+    await deleteSale(sale.id);
+    setSales((current) => current.filter((item) => item.id !== sale.id));
+    setProducts((current) =>
+      current.map((product) => {
+        const soldItem = sale.items.find((item) => item.productId === product.id);
+        return soldItem ? { ...product, stock: product.stock + soldItem.qty } : product;
+      })
+    );
+    void loadStore();
   };
 
   const receivePO = async (po: PurchaseOrder) => {
@@ -133,9 +153,9 @@ export default function App() {
           )}
           {view === "dashboard" && <Dashboard products={products} sales={sales} />}
           {view === "pos" && <POS products={products} cashiers={cashiers} onAddCashier={handleAddCashier} onCheckout={handleCheckout} />}
-          {view === "inventory" && <Inventory products={products} onSaveProduct={handleSaveProduct} onUploadImage={uploadProductImage} />}
+          {view === "inventory" && <Inventory products={products} onSaveProduct={handleSaveProduct} onDeleteProduct={handleDeleteProduct} onUploadImage={uploadProductImage} />}
           {view === "po" && <PurchaseOrders products={products} pos={pos} onCreatePO={handleCreatePO} receivePO={receivePO} undoReceivePO={undoReceivePO} />}
-          {view === "history" && <History sales={sales} />}
+          {view === "history" && <History sales={sales} onDeleteSale={handleDeleteSale} />}
           {view === "reports" && <Reports sales={sales} products={products} />}
         </main>
       </div>

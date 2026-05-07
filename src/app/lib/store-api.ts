@@ -17,11 +17,22 @@ export type StoreData = {
   purchaseOrders: PurchaseOrder[];
 };
 
-const productSelect = "id, sku, name, category, price, stock, reorder_level, image";
+const productSelect = "id, sku, name, category, price, stock, reorder_level, image, deleted_at";
+const legacyProductSelect = "id, sku, name, category, price, stock, reorder_level, image";
 
 export function getStoreErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "object" && error && "message" in error) return String(error.message);
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error && "message" in error
+        ? String(error.message)
+        : "";
+
+  if (message.includes("Could not find the function public.delete_")) {
+    return "The Supabase delete functions are not installed yet. Apply the latest Supabase migration and try again.";
+  }
+
+  if (message) return message;
   return "Unexpected Supabase error.";
 }
 
@@ -101,8 +112,13 @@ export async function fetchStoreData(): Promise<StoreData> {
   }
 
   const client = getSupabaseClient();
-  const [productsResult, cashiersResult, salesResult, purchaseOrdersResult] = await Promise.all([
-    client.from("products").select(productSelect).order("name"),
+  let productsResult = await client.from("products").select(productSelect).is("deleted_at", null).order("name");
+
+  if (productsResult.error && productsResult.error.message.toLowerCase().includes("deleted_at")) {
+    productsResult = await client.from("products").select(legacyProductSelect).order("name");
+  }
+
+  const [cashiersResult, salesResult, purchaseOrdersResult] = await Promise.all([
     client.from("cashiers").select("name, created_at").order("name"),
     client.from("sales").select("id, date, cashier, total, created_at, sale_items(name, price, product_id, qty, sale_id)").order("date", {
       ascending: false,
@@ -127,14 +143,31 @@ export async function saveProduct(product: Product) {
   if (!hasSupabaseConfig) return product;
 
   const client = getSupabaseClient();
-  const { data, error } = await client
+  let result = await client
     .from("products")
     .upsert(productToRow(product), { onConflict: "id" })
     .select(productSelect)
     .single();
 
+  if (result.error && result.error.message.toLowerCase().includes("deleted_at")) {
+    result = await client
+      .from("products")
+      .upsert(productToRow(product), { onConflict: "id" })
+      .select(legacyProductSelect)
+      .single();
+  }
+
+  if (result.error) throw result.error;
+  return mapProduct(result.data as ProductRow);
+}
+
+export async function deleteProduct(id: string) {
+  if (!hasSupabaseConfig) return;
+
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("delete_product", { p_product_id: id });
+
   if (error) throw error;
-  return mapProduct(data as ProductRow);
 }
 
 export async function addCashier(name: string) {
@@ -162,6 +195,15 @@ export async function checkoutSale(sale: Sale) {
     p_items: items,
     p_sale_id: sale.id,
   });
+
+  if (error) throw error;
+}
+
+export async function deleteSale(id: string) {
+  if (!hasSupabaseConfig) return;
+
+  const client = getSupabaseClient();
+  const { error } = await client.rpc("delete_sale", { p_sale_id: id });
 
   if (error) throw error;
 }

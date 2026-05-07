@@ -10,7 +10,7 @@ import { Label } from "./ui/label";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { peso, Product } from "./store-data";
 import { getStoreErrorMessage } from "../lib/store-api";
-import { Plus, Search, Pencil, ImagePlus, Check, X } from "lucide-react";
+import { Plus, Search, Pencil, ImagePlus, Check, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_CATEGORIES = ["Grocery", "Beverages", "Personal Care"];
@@ -18,10 +18,12 @@ const DEFAULT_CATEGORIES = ["Grocery", "Beverages", "Personal Care"];
 export function Inventory({
   products,
   onSaveProduct,
+  onDeleteProduct,
   onUploadImage,
 }: {
   products: Product[];
   onSaveProduct: (product: Product) => Promise<void>;
+  onDeleteProduct: (product: Product) => Promise<void>;
   onUploadImage: (file: File, productId: string) => Promise<string>;
 }) {
   const [query, setQuery] = useState("");
@@ -30,6 +32,7 @@ export function Inventory({
   const [adding, setAdding] = useState(false);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setCategories((prev) => {
@@ -61,6 +64,23 @@ export function Inventory({
   const handleAddCategory = (name: string) => {
     if (!categories.includes(name)) {
       setCategories((prev) => [...prev, name]);
+    }
+  };
+
+  const deleteProduct = async (product: Product) => {
+    const confirmed = window.confirm(`Delete ${product.name} from inventory? Sales and purchase order history will stay intact.`);
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await onDeleteProduct(product);
+      toast.success("Product deleted");
+      setEditing(null);
+      setAdding(false);
+    } catch (error) {
+      toast.error(getStoreErrorMessage(error));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -148,7 +168,9 @@ export function Inventory({
           onAddCategory={handleAddCategory}
           onUploadImage={onUploadImage}
           onSave={saveProduct}
+          onDelete={deleteProduct}
           saving={saving}
+          deleting={deleting}
         />
       )}
     </div>
@@ -163,7 +185,9 @@ function ProductDialog({
   onAddCategory,
   onUploadImage,
   onSave,
+  onDelete,
   saving,
+  deleting,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -172,7 +196,9 @@ function ProductDialog({
   onAddCategory: (name: string) => void;
   onUploadImage: (file: File, productId: string) => Promise<string>;
   onSave: (p: Product) => Promise<void>;
+  onDelete: (p: Product) => Promise<void>;
   saving: boolean;
+  deleting: boolean;
 }) {
   const [form, setForm] = useState<Product>(
     product || { id: `p-${Date.now()}`, sku: "", name: "", category: categories[0] || "Grocery", price: 0, stock: 0, reorderLevel: 5, image: "" }
@@ -296,6 +322,17 @@ function ProductDialog({
           </div>
         </div>
         <DialogFooter>
+          {product && (
+            <Button
+              variant="outline"
+              className="rounded-full border-[#ff3b30]/25 text-[#ff3b30] hover:bg-[#ff3b30]/10 sm:mr-auto"
+              onClick={() => onDelete(product)}
+              disabled={saving || deleting || uploadingImage}
+            >
+              <Trash2 className="size-4 mr-1" />
+              {deleting ? "Deleting..." : "Delete Product"}
+            </Button>
+          )}
           <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button className="rounded-full bg-[#007AFF] hover:bg-[#0051D5]" onClick={() => onSave(form)} disabled={!form.name || !form.sku || saving || uploadingImage}>
             {saving ? "Saving..." : "Save"}

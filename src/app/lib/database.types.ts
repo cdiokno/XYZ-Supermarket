@@ -27,6 +27,7 @@ export type Database = {
         Row: {
           category: string;
           created_at: string;
+          deleted_at: string | null;
           id: string;
           image: string | null;
           name: string;
@@ -39,6 +40,7 @@ export type Database = {
         Insert: {
           category: string;
           created_at?: string;
+          deleted_at?: string | null;
           id: string;
           image?: string | null;
           name: string;
@@ -51,6 +53,7 @@ export type Database = {
         Update: {
           category?: string;
           created_at?: string;
+          deleted_at?: string | null;
           id?: string;
           image?: string | null;
           name?: string;
@@ -150,6 +153,18 @@ export type Database = {
           p_cashier: string;
           p_date?: string;
           p_items: Json;
+          p_sale_id: string;
+        };
+        Returns: Database["public"]["Tables"]["sales"]["Row"];
+      };
+      delete_product: {
+        Args: {
+          p_product_id: string;
+        };
+        Returns: Database["public"]["Tables"]["products"]["Row"];
+      };
+      delete_sale: {
+        Args: {
           p_sale_id: string;
         };
         Returns: Database["public"]["Tables"]["sales"]["Row"];

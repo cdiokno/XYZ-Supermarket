@@ -2,14 +2,18 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Sale, peso } from "./store-data";
-import { Search, Receipt } from "lucide-react";
+import { getStoreErrorMessage } from "../lib/store-api";
+import { Search, Receipt, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
-export function History({ sales }: { sales: Sale[] }) {
+export function History({ sales, onDeleteSale }: { sales: Sale[]; onDeleteSale: (sale: Sale) => Promise<void> }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Sale | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -25,6 +29,22 @@ export function History({ sales }: { sales: Sale[] }) {
 
   const totalRevenue = filtered.reduce((sum, s) => sum + s.total, 0);
   const totalItems = filtered.reduce((sum, s) => sum + s.items.reduce((n, i) => n + i.qty, 0), 0);
+
+  const deleteSale = async (sale: Sale) => {
+    const confirmed = window.confirm(`Delete receipt #${sale.id.toUpperCase()}? Sold quantities will be returned to inventory.`);
+    if (!confirmed) return;
+
+    setDeletingId(sale.id);
+    try {
+      await onDeleteSale(sale);
+      toast.success("Transaction deleted");
+      setSelected((current) => (current?.id === sale.id ? null : current));
+    } catch (error) {
+      toast.error(getStoreErrorMessage(error));
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -96,9 +116,25 @@ export function History({ sales }: { sales: Sale[] }) {
                     <TableCell className="text-right">{qty}</TableCell>
                     <TableCell className="text-right">{peso(s.total)}</TableCell>
                     <TableCell className="text-right">
-                      <Badge variant="secondary" className="rounded-full">
-                        <Receipt className="size-3 mr-1" />View
-                      </Badge>
+                      <div className="flex justify-end gap-2">
+                        <Badge variant="secondary" className="rounded-full">
+                          <Receipt className="size-3 mr-1" />View
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`Delete receipt #${s.id.toUpperCase()}`}
+                          title={`Delete receipt #${s.id.toUpperCase()}`}
+                          className="size-7 rounded-full text-[#ff3b30] hover:bg-[#ff3b30]/10"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void deleteSale(s);
+                          }}
+                          disabled={deletingId === s.id}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -142,6 +178,19 @@ export function History({ sales }: { sales: Sale[] }) {
                 <span style={{ fontWeight: 590 }}>{peso(selected.total)}</span>
               </div>
             </div>
+          )}
+          {selected && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="rounded-full border-[#ff3b30]/25 text-[#ff3b30] hover:bg-[#ff3b30]/10"
+                onClick={() => deleteSale(selected)}
+                disabled={deletingId === selected.id}
+              >
+                <Trash2 className="size-4 mr-1" />
+                {deletingId === selected.id ? "Deleting..." : "Delete Transaction"}
+              </Button>
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
