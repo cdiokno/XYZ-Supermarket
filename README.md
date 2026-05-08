@@ -3,6 +3,25 @@
 
 Vite + React supermarket dashboard backed by Supabase.
 
+## Architecture
+
+The app is organized by concern:
+
+- `src/app`: app shell, router, and providers
+- `src/features`: route-level feature modules
+- `src/domain`: business types, seed data, and format helpers
+- `src/services`: Supabase client and data access layer
+- `src/shared`: reusable UI primitives and shared components
+
+Route-level code splitting is enabled through lazy-loaded feature routes:
+
+- `/dashboard`
+- `/pos`
+- `/inventory`
+- `/purchase-orders`
+- `/history`
+- `/reports`
+
 ## Local Development
 
 ```bash
@@ -17,11 +36,18 @@ VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
 ```
 
-`.env.local` is configured for the `XYZ Supermarket` Supabase project. Use `.env.example` as the template for other environments.
+The app also accepts:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+Create `.env.local` from `.env.example` and set your project values.
 
 ## Supabase
 
-The backend schema is in `supabase/migrations/20260507033636_init_xyz_supermarket_backend.sql`.
+The backend schema is versioned in `supabase/migrations`.
 
 It creates:
 
@@ -31,7 +57,7 @@ It creates:
 - `sale_items`
 - `purchase_orders`
 - `product-images` storage bucket
-- RPC functions for checkout and receiving purchase orders
+- RPC functions for checkout, deletes, PO receive, and undo receive
 
 The current case-study app does not include user authentication, so write policies are intentionally open for the public Vite client. Add Supabase Auth and role-based RLS before using this with real store data.
 
