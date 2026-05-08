@@ -43,8 +43,6 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
 
-Create `.env.local` from `.env.example` and set your project values.
-
 ## Supabase
 
 The backend schema is versioned in `supabase/migrations`.
