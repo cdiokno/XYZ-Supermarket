@@ -1,5 +1,6 @@
 {
-  "name": "@figma/my-make-file",
+  "name": "xyz-supermarket",
+  "description": "XYZ Supermarket operations dashboard",
   "private": true,
   "version": "0.0.1",
   "type": "module",
