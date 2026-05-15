@@ -1,9 +1,10 @@
 import { Suspense } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Button } from "@/shared/ui/button";
 import { Toaster } from "@/shared/ui/sonner";
-import { navItems, Sidebar } from "@/features/navigation/Sidebar";
+import { getNavItems, Sidebar } from "@/features/navigation/Sidebar";
 import { useStore } from "@/app/providers/store-provider";
+import { useAuth } from "@/app/providers/auth-provider";
 
 function RouteFallback() {
   return (
@@ -17,6 +18,26 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const { loading, syncing, loadError, hasSupabaseConfig } = useStore();
+  const { currentUser } = useAuth();
+  const isSettingsRoute = location.pathname === "/settings" || location.pathname.startsWith("/settings/");
+  const navItems = getNavItems(true);
+
+  if (!currentUser && isSettingsRoute) {
+    return (
+      <div className="min-h-screen bg-[#f2f2f7]">
+        <main className="p-4 sm:p-8">
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
+        </main>
+        <Toaster position="top-right" />
+      </div>
+    );
+  }
+
+  if (!currentUser && !isSettingsRoute) {
+    return <Navigate to="/settings" replace />;
+  }
 
   if (loading) {
     return (
@@ -32,28 +53,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] flex">
-      <Sidebar currentPath={location.pathname} onNavigate={navigate} />
+      <Sidebar currentPath={location.pathname} onNavigate={navigate} navItems={navItems} />
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="md:hidden border-b border-black/5 bg-white/80 backdrop-blur-xl p-3 flex gap-2 overflow-x-auto sticky top-0 z-20">
-          {navItems.map((item) => {
-            const active = location.pathname === item.path;
-            return (
-              <Button
-                key={item.key}
-                size="sm"
-                variant={active ? "default" : "outline"}
-                onClick={() => navigate(item.path)}
-                className="rounded-full"
-              >
-                <item.icon className="size-4 mr-1" />
-                {item.label}
-              </Button>
-            );
-          })}
-        </header>
-
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 pb-28 md:p-8 md:pb-8">
           {loadError && (
             <div className="mb-4 rounded-2xl border border-[#ff3b30]/20 bg-[#ff3b30]/10 px-4 py-3 text-[#9f1d17]">
               {loadError}
@@ -68,6 +71,30 @@ export function AppShell() {
             <Outlet />
           </Suspense>
         </main>
+
+        <nav className="md:hidden fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 w-[calc(100%-1.5rem)] max-w-md rounded-full border border-black/10 bg-white/90 backdrop-blur-2xl shadow-[0_12px_30px_rgba(0,0,0,0.12)] px-2 py-1.5">
+          <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
+            {navItems.map((item) => {
+              const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+              return (
+                <Button
+                  key={item.key}
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label={item.label}
+                  title={item.label}
+                  onClick={() => navigate(item.path)}
+                  className={`mx-auto h-10 w-10 rounded-full ${
+                    active ? "bg-[#007AFF] text-white hover:bg-[#0051D5]" : "text-[#1a1a1a] hover:bg-black/5"
+                  }`}
+                >
+                  <item.icon className="size-5" />
+                </Button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
 
       {syncing && (

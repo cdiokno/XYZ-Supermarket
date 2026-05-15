@@ -8,6 +8,7 @@ const InventoryPage = lazy(() => import("@/features/inventory"));
 const PurchaseOrdersPage = lazy(() => import("@/features/purchase-orders"));
 const HistoryPage = lazy(() => import("@/features/history"));
 const ReportsPage = lazy(() => import("@/features/reports"));
+const SettingsPage = lazy(() => import("@/features/settings"));
 
 export const appRouter = createBrowserRouter([
   {
@@ -45,6 +46,10 @@ export const appRouter = createBrowserRouter([
       {
         path: "reports",
         element: <ReportsPage />,
+      },
+      {
+        path: "settings",
+        element: <SettingsPage />,
       },
       {
         path: "*",

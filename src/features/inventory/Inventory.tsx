@@ -17,11 +17,13 @@ const DEFAULT_CATEGORIES = ["Grocery", "Beverages", "Personal Care"];
 
 export function Inventory({
   products,
+  hasPendingOrder,
   onSaveProduct,
   onDeleteProduct,
   onUploadImage,
 }: {
   products: Product[];
+  hasPendingOrder: boolean;
   onSaveProduct: (product: Product) => Promise<void>;
   onDeleteProduct: (product: Product) => Promise<void>;
   onUploadImage: (file: File, productId: string) => Promise<string>;
@@ -46,6 +48,28 @@ export function Inventory({
       (category === "all" || p.category === category) &&
       (p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.toLowerCase().includes(query.toLowerCase()))
   );
+
+  const promptRemovePendingOrder = () => {
+    window.alert("Remove all items from the current POS order before editing inventory.");
+  };
+
+  const startAdding = () => {
+    if (hasPendingOrder) {
+      promptRemovePendingOrder();
+      return;
+    }
+
+    setAdding(true);
+  };
+
+  const startEditing = (product: Product) => {
+    if (hasPendingOrder) {
+      promptRemovePendingOrder();
+      return;
+    }
+
+    setEditing(product);
+  };
 
   const saveProduct = async (p: Product) => {
     setSaving(true);
@@ -89,9 +113,8 @@ export function Inventory({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="tracking-tight">Inventory</h2>
-          <p className="text-muted-foreground">Real-time stock with product photos.</p>
         </div>
-        <Button onClick={() => setAdding(true)} className="rounded-full bg-[#007AFF] hover:bg-[#0051D5]"><Plus className="size-4 mr-1" /> Add Product</Button>
+        <Button onClick={startAdding} className="rounded-full bg-[#007AFF] hover:bg-[#0051D5]"><Plus className="size-4 mr-1" /> Add Product</Button>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -148,7 +171,7 @@ export function Inventory({
                       {p.stock === 0 ? <Badge className="rounded-full bg-[#ff3b30]">Out</Badge> : low ? <Badge className="rounded-full bg-orange-500">Low</Badge> : <Badge className="rounded-full bg-[#007AFF]">OK</Badge>}
                     </TableCell>
                     <TableCell>
-                      <Button size="icon" variant="ghost" className="rounded-full" onClick={() => setEditing(p)}><Pencil className="size-4" /></Button>
+                      <Button size="icon" variant="ghost" className="rounded-full" onClick={() => startEditing(p)}><Pencil className="size-4" /></Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -325,7 +348,7 @@ function ProductDialog({
           {product && (
             <Button
               variant="outline"
-              className="rounded-full border-[#ff3b30]/25 text-[#ff3b30] hover:bg-[#ff3b30]/10 sm:mr-auto"
+              className="rounded-full border-[#ff3b30]/25 text-[#ff3b30] hover:bg-[#ff3b30]/10 hover:text-[#ff3b30] sm:mr-auto"
               onClick={() => onDelete(product)}
               disabled={saving || deleting || uploadingImage}
             >

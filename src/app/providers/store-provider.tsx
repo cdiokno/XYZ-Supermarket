@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Product, PurchaseOrder, Sale } from "@/domain/store";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import type { Product, PurchaseOrder, Sale, SaleItem } from "@/domain/store";
 import {
   addCashier,
   checkoutSale,
@@ -26,6 +26,10 @@ type StoreContextValue = {
   syncing: boolean;
   loadError: string | null;
   hasSupabaseConfig: boolean;
+  posCart: SaleItem[];
+  posTendered: string;
+  setPosCart: Dispatch<SetStateAction<SaleItem[]>>;
+  setPosTendered: Dispatch<SetStateAction<string>>;
   checkout: (sale: Sale) => Promise<void>;
   saveProduct: (product: Product) => Promise<void>;
   deleteProduct: (product: Product) => Promise<void>;
@@ -39,6 +43,40 @@ type StoreContextValue = {
 };
 
 const StoreContext = createContext<StoreContextValue | null>(null);
+const POS_CART_STORAGE_KEY = "xyz-supermarket-pos-cart";
+const POS_TENDERED_STORAGE_KEY = "xyz-supermarket-pos-tendered";
+
+function readPosCart() {
+  if (typeof window === "undefined") return [];
+
+  const raw = window.localStorage.getItem(POS_CART_STORAGE_KEY);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter((item): item is SaleItem => {
+      if (typeof item !== "object" || item === null) return false;
+
+      const candidate = item as Partial<SaleItem>;
+      return (
+        typeof candidate.productId === "string" &&
+        typeof candidate.name === "string" &&
+        Number.isFinite(candidate.price) &&
+        Number.isFinite(candidate.qty) &&
+        Number(candidate.qty) > 0
+      );
+    });
+  } catch {
+    return [];
+  }
+}
+
+function readPosTendered() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(POS_TENDERED_STORAGE_KEY) || "";
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -48,6 +86,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [posCart, setPosCart] = useState<SaleItem[]>(() => readPosCart());
+  const [posTendered, setPosTendered] = useState(() => readPosTendered());
 
   const loadStore = useCallback(async (initial = false) => {
     try {
@@ -76,6 +116,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadStore(true);
   }, [loadStore]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (posCart.length === 0) {
+      window.localStorage.removeItem(POS_CART_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(POS_CART_STORAGE_KEY, JSON.stringify(posCart));
+  }, [posCart]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!posTendered) {
+      window.localStorage.removeItem(POS_TENDERED_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(POS_TENDERED_STORAGE_KEY, posTendered);
+  }, [posTendered]);
 
   const handleCheckout = useCallback(
     async (sale: Sale) => {
@@ -185,6 +247,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       syncing,
       loadError,
       hasSupabaseConfig,
+      posCart,
+      posTendered,
+      setPosCart,
+      setPosTendered,
       checkout: handleCheckout,
       saveProduct: handleSaveProduct,
       deleteProduct: handleDeleteProduct,
@@ -204,6 +270,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loading,
       syncing,
       loadError,
+      posCart,
+      posTendered,
       handleCheckout,
       handleSaveProduct,
       handleDeleteProduct,

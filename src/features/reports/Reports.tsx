@@ -1,12 +1,17 @@
-import { useState, useMemo } from "react";
+import { useRef, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/shared/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { Button } from "@/shared/ui/button";
 import { Product, Sale, peso } from "@/domain/store";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
 
 export function Reports({ sales, products }: { sales: Sale[]; products: Product[] }) {
   const [range, setRange] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -47,11 +52,61 @@ export function Reports({ sales, products }: { sales: Sale[]; products: Product[
 
   const cardCls = "rounded-3xl border-black/5 shadow-sm";
 
+  const exportToPdf = async () => {
+    if (!reportRef.current || exporting) return;
+    setExporting(true);
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#f2f2f7",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let remainingHeight = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      remainingHeight -= pdfHeight;
+
+      while (remainingHeight > 0) {
+        position = remainingHeight - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        remainingHeight -= pdfHeight;
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      pdf.save(`xyz-supermarket-reports-${range}-${stamp}.pdf`);
+      toast.success("Report exported to PDF");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to export report to PDF");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" ref={reportRef}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="tracking-tight">Reports</h2>
-        <p className="text-muted-foreground mt-1">Auto-generated sales and inventory summaries.</p>
+        <Button
+          type="button"
+          onClick={exportToPdf}
+          disabled={exporting}
+          className="rounded-full bg-[#007AFF] hover:bg-[#0051D5]"
+        >
+          <Download className="size-4 mr-1" />
+          {exporting ? "Exporting..." : "Export PDF"}
+        </Button>
       </div>
 
       <Tabs value={range} onValueChange={(v) => setRange(v as typeof range)} className="space-y-6">

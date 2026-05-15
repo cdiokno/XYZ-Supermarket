@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { LayoutDashboard, ScanBarcode, Package, Truck, FileBarChart, History } from "lucide-react";
+import { LayoutDashboard, ScanBarcode, Package, Truck, FileBarChart, History, Settings } from "lucide-react";
 import { AppLogo } from "@/shared/brand";
 
-export type View = "dashboard" | "pos" | "inventory" | "purchase-orders" | "reports" | "history";
+export type View = "dashboard" | "pos" | "inventory" | "purchase-orders" | "reports" | "history" | "settings";
 
-export const navItems: { key: View; path: string; label: string; icon: typeof LayoutDashboard }[] = [
+export type NavItem = { key: View; path: string; label: string; icon: typeof LayoutDashboard };
+
+const baseNavItems: NavItem[] = [
   { key: "dashboard", path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "pos", path: "/pos", label: "Point of Sale", icon: ScanBarcode },
   { key: "inventory", path: "/inventory", label: "Inventory", icon: Package },
@@ -13,20 +14,31 @@ export const navItems: { key: View; path: string; label: string; icon: typeof La
   { key: "reports", path: "/reports", label: "Reports", icon: FileBarChart },
 ];
 
-export function Sidebar({ currentPath, onNavigate }: { currentPath: string; onNavigate: (path: string) => void }) {
-  const [hover, setHover] = useState(false);
-  const expanded = hover;
-  const width = expanded ? 280 : 84;
+const settingsNavItem: NavItem = { key: "settings", path: "/settings", label: "Settings", icon: Settings };
+
+export function getNavItems(includeSettings: boolean): NavItem[] {
+  return includeSettings ? [...baseNavItems, settingsNavItem] : baseNavItems;
+}
+
+export function Sidebar({
+  currentPath,
+  onNavigate,
+  navItems,
+}: {
+  currentPath: string;
+  onNavigate: (path: string) => void;
+  navItems: NavItem[];
+}) {
+  const expanded = true;
+  const width = 280;
   const easing = "cubic-bezier(0.32, 0.72, 0, 1)";
 
   return (
     <div
       className="hidden md:block shrink-0 sticky top-0 h-screen p-3"
-      style={{ width, transition: `width 420ms ${easing}` }}
+      style={{ width }}
     >
       <aside
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
         className="h-full rounded-[28px] bg-white/70 backdrop-blur-2xl border border-black/5 flex flex-col overflow-hidden"
       >
         <div className={`flex items-center pt-5 pb-4 ${expanded ? "px-5 gap-3" : "px-0 justify-center"}`}>

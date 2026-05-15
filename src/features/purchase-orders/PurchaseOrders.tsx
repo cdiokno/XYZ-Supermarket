@@ -138,7 +138,6 @@ export function PurchaseOrders({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2>Purchase Orders</h2>
-          <p className="text-muted-foreground">Log POs and record deliveries to update inventory.</p>
         </div>
         <Button onClick={() => setOpen(true)}><Plus className="size-4 mr-1" /> New PO</Button>
       </div>

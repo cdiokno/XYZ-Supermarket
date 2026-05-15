@@ -50,7 +50,6 @@ export function History({ sales, onDeleteSale }: { sales: Sale[]; onDeleteSale: 
     <div className="space-y-4">
       <div>
         <h2>Transaction History</h2>
-        <p className="text-muted-foreground">Complete record of every checkout from the POS.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -4,7 +4,7 @@ import { peso, Product, Sale } from "@/domain/store";
 import { TrendingUp, Package, AlertTriangle, ShoppingCart } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
-export function Dashboard({ products, sales }: { products: Product[]; sales: Sale[] }) {
+export function Dashboard({ products, sales, userName }: { products: Product[]; sales: Sale[]; userName: string }) {
   const today = new Date().toDateString();
   const todaySales = sales.filter((s) => new Date(s.date).toDateString() === today);
   const todayRevenue = todaySales.reduce((a, s) => a + s.total, 0);
@@ -30,12 +30,12 @@ export function Dashboard({ products, sales }: { products: Product[]; sales: Sal
     <div className="space-y-6">
       <div>
         <h2>Dashboard</h2>
-        <p className="text-muted-foreground">Real-time view of sales and inventory.</p>
+        <p className="text-muted-foreground mt-1">Welcome, {userName}</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {stats.map((s) => (
           <Card key={s.label} className="rounded-3xl border-black/5 shadow-sm">
-            <CardContent className="p-5 flex items-center justify-between">
+            <CardContent className="p-4 sm:p-5 flex items-center justify-between min-h-28">
               <div>
                 <p className="text-muted-foreground">{s.label}</p>
                 <p className="mt-2">{s.value}</p>
