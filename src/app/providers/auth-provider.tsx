@@ -1,24 +1,29 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createBackendCashierAccount, fetchBackendAccounts, loginBackendAccount, updateBackendAccount } from "@/services/auth";
+import { hasSupabaseConfig } from "@/services/supabase";
 
 export type UserRole = "admin" | "cashier";
 
 export type AuthAccount = {
   username: string;
   name: string;
-  password: string;
+  password?: string;
   role: UserRole;
   profileImage: string;
 };
 
 export type AuthUser = Omit<AuthAccount, "password">;
 
+type AuthResult = { ok: true } | { ok: false; message: string };
+
 type AuthContextValue = {
   currentUser: AuthUser | null;
   accounts: AuthAccount[];
+  loading: boolean;
   isAdmin: boolean;
-  login: (username: string, password: string) => { ok: true } | { ok: false; message: string };
+  login: (username: string, password: string) => Promise<AuthResult>;
   logout: () => void;
-  addCashierAccount: (account: { name: string; username: string; password: string }) => { ok: true } | { ok: false; message: string };
+  addCashierAccount: (account: { name: string; username: string; password: string }) => Promise<AuthResult>;
   updateCurrentAccount: (payload: {
     name: string;
     username: string;
@@ -26,7 +31,7 @@ type AuthContextValue = {
     currentPassword?: string;
     newPassword?: string;
     confirmNewPassword?: string;
-  }) => { ok: true } | { ok: false; message: string };
+  }) => Promise<AuthResult>;
 };
 
 const ACCOUNT_STORAGE_KEY = "xyz-supermarket-accounts";
@@ -39,6 +44,24 @@ const defaultAdmin: AuthAccount = {
   role: "admin",
   profileImage: "",
 };
+
+function toAuthUser(account: AuthAccount): AuthUser {
+  const { password: _password, ...user } = account;
+  return user;
+}
+
+function sortAccounts(accounts: AuthAccount[]) {
+  return [...accounts].sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
+}
+
+function upsertAccount(accounts: AuthAccount[], account: AuthAccount) {
+  const exists = accounts.some((candidate) => candidate.username.toLowerCase() === account.username.toLowerCase());
+  const next = exists
+    ? accounts.map((candidate) => (candidate.username.toLowerCase() === account.username.toLowerCase() ? account : candidate))
+    : [...accounts, account];
+
+  return sortAccounts(next);
+}
 
 function normalizeAccount(account: AuthAccount): AuthAccount {
   return {
@@ -90,28 +113,90 @@ function saveAccounts(accounts: AuthAccount[]) {
   window.localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(accounts));
 }
 
+function readSessionUsername() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(SESSION_STORAGE_KEY) || "";
+}
+
+function saveSessionUsername(username: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SESSION_STORAGE_KEY, username);
+}
+
+function clearSessionUsername() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
 function readSessionUser(accounts: AuthAccount[]): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  const username = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  const username = readSessionUsername();
   if (!username) return null;
 
   const account = accounts.find((candidate) => candidate.username.toLowerCase() === username.toLowerCase());
-  if (!account) return null;
+  return account ? toAuthUser(account) : null;
+}
 
-  const { password: _password, ...user } = account;
-  return user;
+function messageFromError(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected account error.";
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [accounts, setAccounts] = useState<AuthAccount[]>(() => readAccounts());
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => readSessionUser(readAccounts()));
+  const [accounts, setAccounts] = useState<AuthAccount[]>(() => (hasSupabaseConfig ? [] : readAccounts()));
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => (hasSupabaseConfig ? null : readSessionUser(readAccounts())));
+  const [loading, setLoading] = useState(hasSupabaseConfig);
 
-  const login: AuthContextValue["login"] = (usernameInput, password) => {
+  useEffect(() => {
+    if (!hasSupabaseConfig) return;
+
+    let cancelled = false;
+
+    async function loadBackendAccounts() {
+      setLoading(true);
+      try {
+        const backendAccounts = await fetchBackendAccounts();
+        if (cancelled) return;
+
+        const nextAccounts = sortAccounts(backendAccounts);
+        const sessionUsername = readSessionUsername();
+        const sessionAccount = nextAccounts.find((account) => account.username.toLowerCase() === sessionUsername.toLowerCase());
+
+        setAccounts(nextAccounts);
+        setCurrentUser(sessionAccount ? toAuthUser(sessionAccount) : null);
+        if (!sessionAccount) clearSessionUsername();
+      } catch {
+        if (cancelled) return;
+        setAccounts([]);
+        setCurrentUser(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadBackendAccounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const login: AuthContextValue["login"] = async (usernameInput, password) => {
     const username = usernameInput.trim();
     if (!username || !password) {
       return { ok: false, message: "Enter username and password." };
+    }
+
+    if (hasSupabaseConfig) {
+      try {
+        const account = await loginBackendAccount(username, password);
+        setCurrentUser(account);
+        saveSessionUsername(account.username);
+        setAccounts((current) => upsertAccount(current, account));
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: messageFromError(error) };
+      }
     }
 
     const account = accounts.find((candidate) => candidate.username.toLowerCase() === username.toLowerCase());
@@ -119,22 +204,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, message: "Invalid username or password." };
     }
 
-    const { password: _password, ...user } = account;
+    const user = toAuthUser(account);
     setCurrentUser(user);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SESSION_STORAGE_KEY, user.username);
-    }
+    saveSessionUsername(user.username);
     return { ok: true };
   };
 
   const logout = () => {
     setCurrentUser(null);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(SESSION_STORAGE_KEY);
-    }
+    clearSessionUsername();
   };
 
-  const addCashierAccount: AuthContextValue["addCashierAccount"] = ({ name, username, password }) => {
+  const addCashierAccount: AuthContextValue["addCashierAccount"] = async ({ name, username, password }) => {
     const trimmedName = name.trim();
     const trimmedUsername = username.trim();
 
@@ -150,7 +231,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, message: "Cashier name already has an account." };
     }
 
-    const nextAccounts = [
+    if (hasSupabaseConfig) {
+      try {
+        const createdAccount = await createBackendCashierAccount({
+          name: trimmedName,
+          username: trimmedUsername,
+          password,
+        });
+
+        setAccounts((current) => upsertAccount(current, createdAccount));
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: messageFromError(error) };
+      }
+    }
+
+    const nextAccounts = sortAccounts([
       ...accounts,
       {
         name: trimmedName,
@@ -159,14 +255,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: "cashier",
         profileImage: "",
       },
-    ];
+    ]);
 
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
     return { ok: true };
   };
 
-  const updateCurrentAccount: AuthContextValue["updateCurrentAccount"] = ({
+  const updateCurrentAccount: AuthContextValue["updateCurrentAccount"] = async ({
     name,
     username,
     profileImage,
@@ -188,15 +284,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, message: "Name and username are required." };
     }
 
-    const activeIndex = accounts.findIndex(
-      (account) => account.username.toLowerCase() === currentUser.username.toLowerCase()
-    );
-    if (activeIndex < 0) {
-      return { ok: false, message: "Could not find your account." };
-    }
-
     const hasUsernameConflict = accounts.some(
-      (account, index) => index !== activeIndex && account.username.toLowerCase() === trimmedUsername.toLowerCase()
+      (account) =>
+        account.username.toLowerCase() !== currentUser.username.toLowerCase() &&
+        account.username.toLowerCase() === trimmedUsername.toLowerCase()
     );
     if (hasUsernameConflict) {
       return { ok: false, message: "Username already exists." };
@@ -208,15 +299,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!normalizedCurrentPassword || !normalizedNewPassword || !normalizedConfirmNewPassword) {
         return { ok: false, message: "Enter current password and type the new password twice." };
       }
-      if (accounts[activeIndex].password !== normalizedCurrentPassword) {
-        return { ok: false, message: "Current password is incorrect." };
-      }
       if (normalizedNewPassword !== normalizedConfirmNewPassword) {
         return { ok: false, message: "New passwords do not match." };
       }
       if (normalizedNewPassword === normalizedCurrentPassword) {
         return { ok: false, message: "New password must be different from current password." };
       }
+    }
+
+    if (hasSupabaseConfig) {
+      try {
+        const updatedAccount = await updateBackendAccount({
+          currentUsername: currentUser.username,
+          name: trimmedName,
+          username: trimmedUsername,
+          profileImage,
+          currentPassword: wantsPasswordChange ? normalizedCurrentPassword : undefined,
+          newPassword: wantsPasswordChange ? normalizedNewPassword : undefined,
+        });
+
+        setAccounts((current) => upsertAccount(current, updatedAccount));
+        setCurrentUser(updatedAccount);
+        saveSessionUsername(updatedAccount.username);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: messageFromError(error) };
+      }
+    }
+
+    const activeIndex = accounts.findIndex((account) => account.username.toLowerCase() === currentUser.username.toLowerCase());
+    if (activeIndex < 0) {
+      return { ok: false, message: "Could not find your account." };
+    }
+
+    if (wantsPasswordChange && accounts[activeIndex].password !== normalizedCurrentPassword) {
+      return { ok: false, message: "Current password is incorrect." };
     }
 
     const updatedAccount: AuthAccount = {
@@ -227,15 +344,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: wantsPasswordChange ? normalizedNewPassword : accounts[activeIndex].password,
     };
 
-    const nextAccounts = accounts.map((account, index) => (index === activeIndex ? updatedAccount : account));
+    const nextAccounts = sortAccounts(accounts.map((account, index) => (index === activeIndex ? updatedAccount : account)));
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
 
-    const { password: _password, ...user } = updatedAccount;
+    const user = toAuthUser(updatedAccount);
     setCurrentUser(user);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SESSION_STORAGE_KEY, user.username);
-    }
+    saveSessionUsername(user.username);
 
     return { ok: true };
   };
@@ -244,13 +359,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       currentUser,
       accounts,
+      loading,
       isAdmin: currentUser?.role === "admin",
       login,
       logout,
       addCashierAccount,
       updateCurrentAccount,
     }),
-    [accounts, currentUser]
+    [accounts, currentUser, loading]
   );
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;

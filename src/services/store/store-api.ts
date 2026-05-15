@@ -134,7 +134,7 @@ export async function fetchStoreData(): Promise<StoreData> {
   }
 
   const client = getSupabaseClient();
-  let productsResult = await client.from("products").select(productSelect).is("deleted_at", null).order("name");
+  let productsResult: any = await client.from("products").select(productSelect).is("deleted_at", null).order("name");
 
   if (productsResult.error && productsResult.error.message.toLowerCase().includes("deleted_at")) {
     productsResult = await client.from("products").select(legacyProductSelect).order("name");
@@ -202,19 +202,26 @@ export async function deleteProduct(id: string) {
 }
 
 export async function addCashier(name: string) {
+  const trimmedName = name.trim();
+  if (!trimmedName) throw new Error("Cashier name is required.");
+
   if (!hasSupabaseConfig) {
-    if (!localStore.cashiers.includes(name)) {
-      localStore.cashiers.push(name);
+    if (!localStore.cashiers.includes(trimmedName)) {
+      localStore.cashiers.push(trimmedName);
       localStore.cashiers.sort((a, b) => a.localeCompare(b));
     }
-    return name;
+    return trimmedName;
   }
 
   const client = getSupabaseClient();
-  const { data, error } = await client.from("cashiers").upsert({ name }, { onConflict: "name" }).select("name, created_at").single();
+  const { data, error } = await client
+    .from("cashiers")
+    .upsert({ name: trimmedName }, { ignoreDuplicates: true, onConflict: "name" })
+    .select("name, created_at")
+    .maybeSingle();
 
   if (error) throw error;
-  return (data as CashierRow).name;
+  return data ? (data as CashierRow).name : trimmedName;
 }
 
 export async function checkoutSale(sale: Sale) {

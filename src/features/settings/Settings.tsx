@@ -58,10 +58,10 @@ export function Settings() {
     setProfileImage(currentUser.profileImage || "");
   }, [currentUser]);
 
-  const handleLogin = (event: FormEvent) => {
+  const handleLogin = async (event: FormEvent) => {
     event.preventDefault();
     const trimmedUsername = username.trim();
-    const result = login(trimmedUsername, password);
+    const result = await login(trimmedUsername, password);
 
     if (!result.ok) {
       toast.error(result.message);
@@ -98,8 +98,7 @@ export function Settings() {
     setSubmitting(true);
 
     try {
-      await addCashier(trimmedName);
-      const result = addCashierAccount({
+      const result = await addCashierAccount({
         name: trimmedName,
         username: trimmedUsername,
         password: cashierPassword,
@@ -110,6 +109,7 @@ export function Settings() {
         return;
       }
 
+      await addCashier(trimmedName);
       toast.success("Cashier account added.");
       setCashierName("");
       setCashierUsername("");
@@ -138,12 +138,12 @@ export function Settings() {
     }
   };
 
-  const handleProfileUpdate = (event: FormEvent) => {
+  const handleProfileUpdate = async (event: FormEvent) => {
     event.preventDefault();
     setUpdatingProfile(true);
 
     try {
-      const result = updateCurrentAccount({
+      const result = await updateCurrentAccount({
         name: profileName,
         username: profileUsername,
         profileImage,
@@ -163,12 +163,12 @@ export function Settings() {
     }
   };
 
-  const handlePasswordChange = (event: FormEvent) => {
+  const handlePasswordChange = async (event: FormEvent) => {
     event.preventDefault();
     setChangingPassword(true);
 
     try {
-      const result = updateCurrentAccount({
+      const result = await updateCurrentAccount({
         name: profileName,
         username: profileUsername,
         profileImage,

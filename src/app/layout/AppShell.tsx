@@ -18,9 +18,21 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const { loading, syncing, loadError, hasSupabaseConfig } = useStore();
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
   const isSettingsRoute = location.pathname === "/settings" || location.pathname.startsWith("/settings/");
   const navItems = getNavItems(true);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#f2f2f7] grid place-items-center p-6">
+        <div className="rounded-3xl bg-white border border-black/5 shadow-sm px-6 py-5 text-center">
+          <p className="tracking-tight">Loading account data...</p>
+          <p className="text-muted-foreground mt-1">Connecting to Supabase</p>
+        </div>
+        <Toaster position="top-right" />
+      </div>
+    );
+  }
 
   if (!currentUser && isSettingsRoute) {
     return (

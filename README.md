@@ -54,10 +54,11 @@ It creates:
 - `sales`
 - `sale_items`
 - `purchase_orders`
+- private cashier/admin account records exposed through Supabase RPCs
 - `product-images` storage bucket
-- RPC functions for checkout, deletes, PO receive, and undo receive
+- RPC functions for login, cashier account creation, checkout, deletes, PO receive, and undo receive
 
-The current case-study app does not include user authentication, so write policies are intentionally open for the public Vite client. Add Supabase Auth and role-based RLS before using this with real store data.
+The current case-study app uses Supabase RPCs for demo account login and cashier account persistence. Store-data write policies are intentionally open for the public Vite client. Add Supabase Auth and role-based RLS before using this with real store data.
 
 ## Vercel
 

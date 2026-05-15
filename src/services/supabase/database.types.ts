@@ -22,6 +22,7 @@ export type Database = {
           created_at?: string;
           name?: string;
         };
+        Relationships: [];
       };
       products: {
         Row: {
@@ -63,6 +64,7 @@ export type Database = {
           stock?: number;
           updated_at?: string;
         };
+        Relationships: [];
       };
       purchase_orders: {
         Row: {
@@ -98,6 +100,15 @@ export type Database = {
           supplier?: string;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       sale_items: {
         Row: {
@@ -121,6 +132,22 @@ export type Database = {
           qty?: number;
           sale_id?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey";
+            columns: ["sale_id"];
+            isOneToOne: false;
+            referencedRelation: "sales";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       sales: {
         Row: {
@@ -144,10 +171,32 @@ export type Database = {
           id?: string;
           total?: number;
         };
+        Relationships: [
+          {
+            foreignKeyName: "sales_cashier_fkey";
+            columns: ["cashier"];
+            isOneToOne: false;
+            referencedRelation: "cashiers";
+            referencedColumns: ["name"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;
     Functions: {
+      create_cashier_account: {
+        Args: {
+          p_name: string;
+          p_password: string;
+          p_username: string;
+        };
+        Returns: {
+          username: string;
+          name: string;
+          role: string;
+          profile_image: string;
+        }[];
+      };
       checkout_sale: {
         Args: {
           p_cashier: string;
@@ -175,6 +224,27 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
       };
+      list_app_accounts: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          username: string;
+          name: string;
+          role: string;
+          profile_image: string;
+        }[];
+      };
+      login_app_account: {
+        Args: {
+          p_password: string;
+          p_username: string;
+        };
+        Returns: {
+          username: string;
+          name: string;
+          role: string;
+          profile_image: string;
+        }[];
+      };
       receive_purchase_order: {
         Args: {
           p_po_id: string;
@@ -186,6 +256,22 @@ export type Database = {
           p_po_id: string;
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
+      };
+      update_app_account: {
+        Args: {
+          p_current_password?: string | null;
+          p_current_username: string;
+          p_name: string;
+          p_new_password?: string | null;
+          p_profile_image?: string | null;
+          p_username: string;
+        };
+        Returns: {
+          username: string;
+          name: string;
+          role: string;
+          profile_image: string;
+        }[];
       };
     };
     Enums: Record<string, never>;
