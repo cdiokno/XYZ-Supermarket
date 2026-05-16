@@ -164,11 +164,11 @@ export function POS({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      <div className="lg:col-span-5">
+      <div className="lg:col-start-1 lg:col-span-3">
         <h2 className="tracking-tight">Point of Sale</h2>
       </div>
 
-      <Card className="hidden lg:flex lg:col-start-4 lg:col-span-2 lg:row-start-2 lg:row-span-2 lg:self-start lg:-mt-5 h-fit sticky top-2 z-20 lg:top-24 rounded-3xl border-black/5 shadow-sm lg:h-[calc(100dvh-6rem)] lg:flex-col">
+      <Card className="hidden lg:flex lg:col-start-4 lg:col-span-2 lg:row-start-1 lg:row-span-3 lg:self-start lg:-mt-5 h-fit sticky top-2 z-20 lg:top-3 rounded-3xl border-black/5 shadow-sm lg:h-[calc(100dvh-1.5rem)] lg:flex-col">
         <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="flex items-center gap-2 tracking-tight">
             <Receipt className="size-5 text-[#007AFF]" /> Current Order
@@ -404,8 +404,8 @@ export function POS({
         </>
       )}
 
-      <div className="lg:col-start-1 lg:col-span-3 lg:row-start-2 relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+      <div className="lg:col-start-1 lg:col-span-3 lg:row-start-2 relative h-12 self-start">
+        <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
           placeholder="Search products..."
           value={query}
