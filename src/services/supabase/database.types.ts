@@ -224,6 +224,18 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
       };
+      delete_app_account: {
+        Args: {
+          p_admin_username: string;
+          p_target_username: string;
+        };
+        Returns: {
+          username: string;
+          name: string;
+          role: string;
+          profile_image: string;
+        }[];
+      };
       list_app_accounts: {
         Args: Record<PropertyKey, never>;
         Returns: {

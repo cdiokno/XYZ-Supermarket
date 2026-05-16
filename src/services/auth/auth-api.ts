@@ -96,3 +96,14 @@ export async function updateBackendAccount(payload: {
   if (error) throw new Error(getAuthErrorMessage(error));
   return firstAccount(data as AccountRow[] | null);
 }
+
+export async function deleteBackendAccount(payload: { adminUsername: string; targetUsername: string }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc("delete_app_account", {
+    p_admin_username: payload.adminUsername,
+    p_target_username: payload.targetUsername,
+  });
+
+  if (error) throw new Error(getAuthErrorMessage(error));
+  return firstAccount(data as AccountRow[] | null);
+}

@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 import { Button } from "@/shared/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Trash2 } from "lucide-react";
 
 function toInitials(name: string) {
   return name
@@ -30,7 +30,7 @@ function fileToDataUrl(file: File) {
 
 export function Settings() {
   const navigate = useNavigate();
-  const { currentUser, isAdmin, login, logout, accounts, addCashierAccount, updateCurrentAccount } = useAuth();
+  const { currentUser, isAdmin, login, logout, accounts, addCashierAccount, deleteAccount, updateCurrentAccount } = useAuth();
   const { addCashier } = useStore();
 
   const [username, setUsername] = useState("");
@@ -48,6 +48,7 @@ export function Settings() {
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [deletingAccountUsername, setDeletingAccountUsername] = useState("");
 
   const cashierAccounts = useMemo(() => accounts.filter((account) => account.role === "cashier"), [accounts]);
 
@@ -188,6 +189,24 @@ export function Settings() {
       toast.success("Password changed.");
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteCashierAccount = async (targetUsername: string, targetName: string) => {
+    const confirmed = window.confirm(`Delete cashier account for ${targetName} (@${targetUsername})? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingAccountUsername(targetUsername.toLowerCase());
+    try {
+      const result = await deleteAccount(targetUsername);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Cashier account deleted.");
+    } finally {
+      setDeletingAccountUsername("");
     }
   };
 
@@ -420,8 +439,20 @@ export function Settings() {
               {cashierAccounts.length === 0 && <p className="text-muted-foreground">No cashier accounts yet.</p>}
               {cashierAccounts.map((account) => (
                 <div key={account.username} className="rounded-2xl border border-black/5 p-3 flex items-center justify-between gap-2">
-                  <p className="tracking-tight">{account.name}</p>
-                  <p className="text-muted-foreground">@{account.username}</p>
+                  <div>
+                    <p className="tracking-tight">{account.name}</p>
+                    <p className="text-muted-foreground">@{account.username}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => void handleDeleteCashierAccount(account.username, account.name)}
+                    disabled={deletingAccountUsername === account.username.toLowerCase()}
+                  >
+                    <Trash2 className="size-4" />
+                    {deletingAccountUsername === account.username.toLowerCase() ? "Deleting..." : "Delete"}
+                  </Button>
                 </div>
               ))}
             </CardContent>

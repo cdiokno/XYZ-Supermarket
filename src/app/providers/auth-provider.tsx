@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createBackendCashierAccount, fetchBackendAccounts, loginBackendAccount, updateBackendAccount } from "@/services/auth";
+import { createBackendCashierAccount, deleteBackendAccount, fetchBackendAccounts, loginBackendAccount, updateBackendAccount } from "@/services/auth";
 import { hasSupabaseConfig } from "@/services/supabase";
 
 export type UserRole = "admin" | "cashier";
@@ -24,6 +24,7 @@ type AuthContextValue = {
   login: (username: string, password: string) => Promise<AuthResult>;
   logout: () => void;
   addCashierAccount: (account: { name: string; username: string; password: string }) => Promise<AuthResult>;
+  deleteAccount: (username: string) => Promise<AuthResult>;
   updateCurrentAccount: (payload: {
     name: string;
     username: string;
@@ -355,6 +356,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const deleteAccount: AuthContextValue["deleteAccount"] = async (usernameInput) => {
+    if (!currentUser) {
+      return { ok: false, message: "No active session." };
+    }
+
+    if (currentUser.role !== "admin") {
+      return { ok: false, message: "Only administrators can delete accounts." };
+    }
+
+    const username = usernameInput.trim().toLowerCase();
+    if (!username) {
+      return { ok: false, message: "Select an account to delete." };
+    }
+
+    if (username === currentUser.username.toLowerCase()) {
+      return { ok: false, message: "You cannot delete your own account." };
+    }
+
+    const targetAccount = accounts.find((account) => account.username.toLowerCase() === username);
+    if (!targetAccount) {
+      return { ok: false, message: "Account not found." };
+    }
+
+    if (targetAccount.role !== "cashier") {
+      return { ok: false, message: "Only cashier accounts can be deleted." };
+    }
+
+    if (hasSupabaseConfig) {
+      try {
+        await deleteBackendAccount({
+          adminUsername: currentUser.username,
+          targetUsername: targetAccount.username,
+        });
+
+        setAccounts((current) => current.filter((account) => account.username.toLowerCase() !== username));
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, message: messageFromError(error) };
+      }
+    }
+
+    const nextAccounts = accounts.filter((account) => account.username.toLowerCase() !== username);
+    setAccounts(nextAccounts);
+    saveAccounts(nextAccounts);
+    return { ok: true };
+  };
+
   const contextValue = useMemo<AuthContextValue>(
     () => ({
       currentUser,
@@ -364,6 +412,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       addCashierAccount,
+      deleteAccount,
       updateCurrentAccount,
     }),
     [accounts, currentUser, loading]
