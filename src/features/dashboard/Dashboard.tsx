@@ -94,17 +94,17 @@ export function Dashboard({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2>Dashboard</h2>
-          <p className="text-muted-foreground mt-1">Welcome, {userName}</p>
+      <div>
+        <h2>Dashboard</h2>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="text-muted-foreground">Welcome, {userName}</p>
+          <Badge variant={lowStock.length ? "destructive" : "secondary"} className="shrink-0">
+            {lowStock.length} low stock alerts
+          </Badge>
         </div>
-        <Badge variant={lowStock.length ? "destructive" : "secondary"} className="w-fit">
-          {lowStock.length} low stock alerts
-        </Badge>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.label} className="rounded-2xl border-black/5 shadow-sm">
             <CardContent className="flex min-h-28 items-center justify-between gap-3 p-4">

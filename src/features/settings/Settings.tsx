@@ -38,6 +38,7 @@ export function Settings() {
   const [cashierName, setCashierName] = useState("");
   const [cashierUsername, setCashierUsername] = useState("");
   const [cashierPassword, setCashierPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileUsername, setProfileUsername] = useState("");
@@ -62,9 +63,11 @@ export function Settings() {
   const handleLogin = async (event: FormEvent) => {
     event.preventDefault();
     const trimmedUsername = username.trim();
+    setLoggingIn(true);
     const result = await login(trimmedUsername, password);
 
     if (!result.ok) {
+      setLoggingIn(false);
       toast.error(result.message);
       return;
     }
@@ -209,6 +212,24 @@ export function Settings() {
       setDeletingAccountUsername("");
     }
   };
+
+  if (loggingIn) {
+    return (
+      <div className="min-h-[calc(100dvh-3rem)] flex items-center justify-center p-2 sm:p-4">
+        <Card className="w-full max-w-md rounded-3xl border-black/5 shadow-sm">
+          <CardHeader>
+            <CardTitle>Signing in...</CardTitle>
+            <CardDescription>Taking you to dashboard.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" className="w-full h-11 rounded-xl bg-[#007AFF] hover:bg-[#0051D5]" disabled>
+              Signing in...
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
