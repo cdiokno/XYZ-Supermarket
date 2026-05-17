@@ -74,7 +74,8 @@ export type Database = {
           product_id: string;
           product_name: string;
           qty: number;
-          status: "Pending" | "Received";
+          received_qty: number;
+          status: "Pending" | "Partially Received" | "Received";
           supplier: string;
           updated_at: string;
         };
@@ -85,7 +86,8 @@ export type Database = {
           product_id: string;
           product_name: string;
           qty: number;
-          status?: "Pending" | "Received";
+          received_qty?: number;
+          status?: "Pending" | "Partially Received" | "Received";
           supplier: string;
           updated_at?: string;
         };
@@ -96,7 +98,8 @@ export type Database = {
           product_id?: string;
           product_name?: string;
           qty?: number;
-          status?: "Pending" | "Received";
+          received_qty?: number;
+          status?: "Pending" | "Partially Received" | "Received";
           supplier?: string;
           updated_at?: string;
         };
@@ -260,12 +263,14 @@ export type Database = {
       receive_purchase_order: {
         Args: {
           p_po_id: string;
+          p_received_qty?: number | null;
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
       };
       undo_receive_purchase_order: {
         Args: {
           p_po_id: string;
+          p_received_qty?: number | null;
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
       };

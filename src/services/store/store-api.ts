@@ -59,8 +59,28 @@ export function getStoreErrorMessage(error: unknown) {
     return "The Supabase delete functions are not installed yet. Apply the latest Supabase migration and try again.";
   }
 
+  if (message.includes("received_qty") || message.includes("p_received_qty")) {
+    return "Partial purchase-order receiving needs the latest Supabase migration. Apply it and try again.";
+  }
+
   if (message) return message;
   return "Unexpected Supabase error.";
+}
+
+function getPurchaseOrderStatus(receivedQty: number, orderedQty: number): PurchaseOrder["status"] {
+  if (receivedQty <= 0) return "Pending";
+  if (receivedQty >= orderedQty) return "Received";
+  return "Partially Received";
+}
+
+function normalizeReceiptQty(receivedQty: number | undefined, fallback: number) {
+  const qty = Math.floor(Number(receivedQty ?? fallback));
+
+  if (!Number.isFinite(qty) || qty <= 0) {
+    throw new Error("Received quantity must be greater than zero.");
+  }
+
+  return qty;
 }
 
 function mapProduct(row: ProductRow): Product {
@@ -92,6 +112,12 @@ function mapSale(row: SaleWithItems): Sale {
 }
 
 function mapPurchaseOrder(row: PurchaseOrderRow): PurchaseOrder {
+  const legacyRow = row as PurchaseOrderRow & { received_qty?: number | null };
+  const receivedQty = Math.max(
+    0,
+    Math.min(row.qty, Number(legacyRow.received_qty ?? (row.status === "Received" ? row.qty : 0)))
+  );
+
   return {
     id: row.id,
     date: row.date,
@@ -99,7 +125,8 @@ function mapPurchaseOrder(row: PurchaseOrderRow): PurchaseOrder {
     productId: row.product_id,
     productName: row.product_name,
     qty: row.qty,
-    status: row.status,
+    receivedQty,
+    status: getPurchaseOrderStatus(receivedQty, row.qty),
   };
 }
 
@@ -124,6 +151,7 @@ function purchaseOrderToRow(po: PurchaseOrder): Database["public"]["Tables"]["pu
     product_id: po.productId,
     product_name: po.productName,
     qty: po.qty,
+    received_qty: po.receivedQty,
     status: po.status,
   };
 }
@@ -297,9 +325,9 @@ export async function deletePurchaseOrder(id: string) {
     const target = localStore.purchaseOrders.find((po) => po.id === id);
     if (!target) return;
 
-    if (target.status === "Received") {
+    if (target.receivedQty > 0) {
       const product = localStore.products.find((entry) => entry.id === target.productId);
-      if (product) product.stock = Math.max(0, product.stock - target.qty);
+      if (product) product.stock = Math.max(0, product.stock - target.receivedQty);
     }
 
     localStore.purchaseOrders = localStore.purchaseOrders.filter((po) => po.id !== id);
@@ -312,38 +340,61 @@ export async function deletePurchaseOrder(id: string) {
   if (error) throw error;
 }
 
-export async function receivePurchaseOrder(id: string) {
+export async function receivePurchaseOrder(id: string, receivedQty?: number) {
   if (!hasSupabaseConfig) {
     const target = localStore.purchaseOrders.find((po) => po.id === id);
-    if (!target || target.status === "Received") return;
+    if (!target || target.receivedQty >= target.qty) return target ? { ...target } : undefined;
 
-    target.status = "Received";
+    const remainingQty = target.qty - target.receivedQty;
+    const qtyToReceive = normalizeReceiptQty(receivedQty, remainingQty);
+
+    if (qtyToReceive > remainingQty) {
+      throw new Error(`Cannot receive ${qtyToReceive} units; only ${remainingQty} remain for ${target.productName}.`);
+    }
+
+    target.receivedQty += qtyToReceive;
+    target.status = getPurchaseOrderStatus(target.receivedQty, target.qty);
     const product = localStore.products.find((entry) => entry.id === target.productId);
-    if (product) product.stock += target.qty;
-    return;
+    if (product) product.stock += qtyToReceive;
+    return { ...target };
   }
 
   const client = getSupabaseClient();
-  const { error } = await client.rpc("receive_purchase_order", { p_po_id: id });
+  const { data, error } = await client.rpc("receive_purchase_order", {
+    p_po_id: id,
+    p_received_qty: receivedQty ?? null,
+  });
 
   if (error) throw error;
+  return mapPurchaseOrder(data as PurchaseOrderRow);
 }
 
-export async function undoReceivePurchaseOrder(id: string) {
+export async function undoReceivePurchaseOrder(id: string, receivedQty?: number) {
   if (!hasSupabaseConfig) {
     const target = localStore.purchaseOrders.find((po) => po.id === id);
-    if (!target || target.status !== "Received") return;
+    if (!target || target.receivedQty <= 0) return target ? { ...target } : undefined;
 
-    target.status = "Pending";
+    const qtyToUndo = normalizeReceiptQty(receivedQty, target.receivedQty);
+
+    if (qtyToUndo > target.receivedQty) {
+      throw new Error(`Cannot undo ${qtyToUndo} units; only ${target.receivedQty} were received for ${target.productName}.`);
+    }
+
+    target.receivedQty -= qtyToUndo;
+    target.status = getPurchaseOrderStatus(target.receivedQty, target.qty);
     const product = localStore.products.find((entry) => entry.id === target.productId);
-    if (product) product.stock = Math.max(0, product.stock - target.qty);
-    return;
+    if (product) product.stock = Math.max(0, product.stock - qtyToUndo);
+    return { ...target };
   }
 
   const client = getSupabaseClient();
-  const { error } = await client.rpc("undo_receive_purchase_order", { p_po_id: id });
+  const { data, error } = await client.rpc("undo_receive_purchase_order", {
+    p_po_id: id,
+    p_received_qty: receivedQty ?? null,
+  });
 
   if (error) throw error;
+  return mapPurchaseOrder(data as PurchaseOrderRow);
 }
 
 export async function uploadProductImage(file: File, productId: string) {

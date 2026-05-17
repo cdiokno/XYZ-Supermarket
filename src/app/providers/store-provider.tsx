@@ -37,8 +37,8 @@ type StoreContextValue = {
   createPurchaseOrder: (purchaseOrder: PurchaseOrder) => Promise<void>;
   deletePurchaseOrder: (purchaseOrder: PurchaseOrder) => Promise<void>;
   deleteSale: (sale: Sale) => Promise<void>;
-  receivePurchaseOrder: (purchaseOrder: PurchaseOrder) => Promise<void>;
-  undoReceivePurchaseOrder: (purchaseOrder: PurchaseOrder) => Promise<void>;
+  receivePurchaseOrder: (purchaseOrder: PurchaseOrder, receivedQty: number) => Promise<void>;
+  undoReceivePurchaseOrder: (purchaseOrder: PurchaseOrder, receivedQty: number) => Promise<void>;
   uploadProductImage: (file: File, productId: string) => Promise<string>;
 };
 
@@ -179,10 +179,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await deletePurchaseOrder(purchaseOrder.id);
       setPurchaseOrders((current) => current.filter((item) => item.id !== purchaseOrder.id));
 
-      if (purchaseOrder.status === "Received") {
+      if (purchaseOrder.receivedQty > 0) {
         setProducts((current) =>
           current.map((product) =>
-            product.id === purchaseOrder.productId ? { ...product, stock: Math.max(0, product.stock - purchaseOrder.qty) } : product
+            product.id === purchaseOrder.productId
+              ? { ...product, stock: Math.max(0, product.stock - purchaseOrder.receivedQty) }
+              : product
           )
         );
       }
@@ -208,13 +210,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const handleReceivePurchaseOrder = useCallback(
-    async (purchaseOrder: PurchaseOrder) => {
-      await receivePurchaseOrder(purchaseOrder.id);
+    async (purchaseOrder: PurchaseOrder, receivedQty: number) => {
+      const saved = await receivePurchaseOrder(purchaseOrder.id, receivedQty);
       setPurchaseOrders((current) =>
-        current.map((item) => (item.id === purchaseOrder.id ? { ...item, status: "Received" } : item))
+        current.map((item) => (item.id === purchaseOrder.id && saved ? saved : item))
       );
       setProducts((current) =>
-        current.map((product) => (product.id === purchaseOrder.productId ? { ...product, stock: product.stock + purchaseOrder.qty } : product))
+        current.map((product) => (product.id === purchaseOrder.productId ? { ...product, stock: product.stock + receivedQty } : product))
       );
       void loadStore();
     },
@@ -222,14 +224,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const handleUndoReceivePurchaseOrder = useCallback(
-    async (purchaseOrder: PurchaseOrder) => {
-      await undoReceivePurchaseOrder(purchaseOrder.id);
+    async (purchaseOrder: PurchaseOrder, receivedQty: number) => {
+      const saved = await undoReceivePurchaseOrder(purchaseOrder.id, receivedQty);
       setPurchaseOrders((current) =>
-        current.map((item) => (item.id === purchaseOrder.id ? { ...item, status: "Pending" } : item))
+        current.map((item) => (item.id === purchaseOrder.id && saved ? saved : item))
       );
       setProducts((current) =>
         current.map((product) =>
-          product.id === purchaseOrder.productId ? { ...product, stock: Math.max(0, product.stock - purchaseOrder.qty) } : product
+          product.id === purchaseOrder.productId ? { ...product, stock: Math.max(0, product.stock - receivedQty) } : product
         )
       );
       void loadStore();

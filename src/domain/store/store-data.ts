@@ -34,6 +34,8 @@ export type Sale = {
   total: number;
 };
 
+export type PurchaseOrderStatus = "Pending" | "Partially Received" | "Received";
+
 export type PurchaseOrder = {
   id: string;
   date: string;
@@ -41,7 +43,8 @@ export type PurchaseOrder = {
   productId: string;
   productName: string;
   qty: number;
-  status: "Pending" | "Received";
+  receivedQty: number;
+  status: PurchaseOrderStatus;
 };
 
 export const initialProducts: Product[] = [
@@ -81,9 +84,36 @@ export const initialSales: Sale[] = [
 ];
 
 export const initialPOs: PurchaseOrder[] = [
-  { id: "po1", date: day(2), supplier: "MegaFoods Distributors", productId: "p2", productName: "Brown Sugar 1kg", qty: 50, status: "Pending" },
-  { id: "po2", date: day(5), supplier: "AquaSupply Co.", productId: "p6", productName: "Bottled Water 1.5L", qty: 100, status: "Received" },
-  { id: "po3", date: day(1), supplier: "BevTrade Inc.", productId: "p7", productName: "Cola 1.5L", qty: 60, status: "Pending" },
+  {
+    id: "po1",
+    date: day(2),
+    supplier: "MegaFoods Distributors",
+    productId: "p2",
+    productName: "Brown Sugar 1kg",
+    qty: 50,
+    receivedQty: 0,
+    status: "Pending",
+  },
+  {
+    id: "po2",
+    date: day(5),
+    supplier: "AquaSupply Co.",
+    productId: "p6",
+    productName: "Bottled Water 1.5L",
+    qty: 100,
+    receivedQty: 100,
+    status: "Received",
+  },
+  {
+    id: "po3",
+    date: day(1),
+    supplier: "BevTrade Inc.",
+    productId: "p7",
+    productName: "Cola 1.5L",
+    qty: 60,
+    receivedQty: 0,
+    status: "Pending",
+  },
 ];
 
 export const peso = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
