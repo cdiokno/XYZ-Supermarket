@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useStore } from "@/app/providers/store-provider";
+import { AppLoadingSkeleton } from "@/app/layout/AppLoadingSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -215,18 +216,8 @@ export function Settings() {
 
   if (loggingIn) {
     return (
-      <div className="min-h-[calc(100dvh-3rem)] flex items-center justify-center p-2 sm:p-4">
-        <Card className="w-full max-w-md rounded-3xl border-black/5 shadow-sm">
-          <CardHeader>
-            <CardTitle>Signing in...</CardTitle>
-            <CardDescription>Taking you to dashboard.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button type="button" className="w-full h-11 rounded-xl bg-[#007AFF] hover:bg-[#0051D5]" disabled>
-              Signing in...
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="fixed inset-0 z-50">
+        <AppLoadingSkeleton label="Signing in" includeToaster={false} />
       </div>
     );
   }

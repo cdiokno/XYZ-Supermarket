@@ -2,14 +2,15 @@ import { Suspense } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Button } from "@/shared/ui/button";
 import { Toaster } from "@/shared/ui/sonner";
+import { AppLoadingSkeleton, DashboardSkeleton } from "@/app/layout/AppLoadingSkeleton";
 import { getNavItems, Sidebar } from "@/features/navigation/Sidebar";
 import { useStore } from "@/app/providers/store-provider";
 import { useAuth } from "@/app/providers/auth-provider";
 
 function RouteFallback() {
   return (
-    <div className="rounded-3xl bg-white border border-black/5 shadow-sm px-6 py-5 text-center">
-      <p className="tracking-tight">Loading feature...</p>
+    <div role="status" aria-live="polite" aria-busy="true" aria-label="Loading feature">
+      <DashboardSkeleton compact showMobileHeader={false} />
     </div>
   );
 }
@@ -23,15 +24,7 @@ export function AppShell() {
   const navItems = getNavItems(true);
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#f2f2f7] grid place-items-center p-6">
-        <div className="rounded-3xl bg-white border border-black/5 shadow-sm px-6 py-5 text-center">
-          <p className="tracking-tight">Loading account data...</p>
-          <p className="text-muted-foreground mt-1">Connecting to Supabase</p>
-        </div>
-        <Toaster position="top-right" />
-      </div>
-    );
+    return <AppLoadingSkeleton label="Loading account data" />;
   }
 
   if (!currentUser && isSettingsRoute) {
@@ -52,15 +45,7 @@ export function AppShell() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#f2f2f7] grid place-items-center p-6">
-        <div className="rounded-3xl bg-white border border-black/5 shadow-sm px-6 py-5 text-center">
-          <p className="tracking-tight">Loading supermarket data...</p>
-          <p className="text-muted-foreground mt-1">Connecting to Supabase</p>
-        </div>
-        <Toaster position="top-right" />
-      </div>
-    );
+    return <AppLoadingSkeleton label="Loading supermarket data" />;
   }
 
   return (
