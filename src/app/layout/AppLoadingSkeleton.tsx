@@ -63,6 +63,31 @@ function CardShell({ children, className = "" }: { children: React.ReactNode; cl
   );
 }
 
+export function LoginPageSkeleton() {
+  return (
+    <div className="flex min-h-[calc(100dvh-3rem)] items-center justify-center p-2 sm:p-4" aria-hidden="true">
+      <div className="w-full max-w-md rounded-3xl border border-black/5 bg-white p-6">
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-24 rounded-full" />
+          <Skeleton className="h-4 w-64 max-w-full rounded-full" />
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-20 rounded-full" />
+            <Skeleton className="h-11 w-full rounded-xl" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-20 rounded-full" />
+            <Skeleton className="h-11 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardSkeleton({ compact = false, showMobileHeader = true }: { compact?: boolean; showMobileHeader?: boolean }) {
   return (
     <div className="space-y-5" aria-hidden="true">

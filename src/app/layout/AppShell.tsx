@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Button } from "@/shared/ui/button";
 import { Toaster } from "@/shared/ui/sonner";
-import { AppLoadingSkeleton, DashboardSkeleton } from "@/app/layout/AppLoadingSkeleton";
+import { AppLoadingSkeleton, DashboardSkeleton, LoginPageSkeleton } from "@/app/layout/AppLoadingSkeleton";
 import { getNavItems, Sidebar } from "@/features/navigation/Sidebar";
 import { useStore } from "@/app/providers/store-provider";
 import { useAuth } from "@/app/providers/auth-provider";
@@ -11,6 +11,25 @@ function RouteFallback() {
   return (
     <div role="status" aria-live="polite" aria-busy="true" aria-label="Loading feature">
       <DashboardSkeleton compact showMobileHeader={false} />
+    </div>
+  );
+}
+
+function LoginRouteFallback() {
+  return (
+    <div role="status" aria-live="polite" aria-busy="true" aria-label="Loading login">
+      <LoginPageSkeleton />
+    </div>
+  );
+}
+
+function LoginShellFallback() {
+  return (
+    <div className="min-h-screen bg-[#f2f2f7]">
+      <main className="p-4 sm:p-8">
+        <LoginRouteFallback />
+      </main>
+      <Toaster position="top-right" />
     </div>
   );
 }
@@ -24,6 +43,10 @@ export function AppShell() {
   const navItems = getNavItems(true);
 
   if (authLoading) {
+    if (isSettingsRoute) {
+      return <LoginShellFallback />;
+    }
+
     return <AppLoadingSkeleton label="Loading account data" />;
   }
 
@@ -31,7 +54,7 @@ export function AppShell() {
     return (
       <div className="min-h-screen bg-[#f2f2f7]">
         <main className="p-4 sm:p-8">
-          <Suspense fallback={<RouteFallback />}>
+          <Suspense fallback={<LoginRouteFallback />}>
             <Outlet />
           </Suspense>
         </main>

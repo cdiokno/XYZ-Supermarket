@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppShell } from "@/app/layout/AppShell";
+import { RouteErrorBoundary } from "@/app/RouteErrorBoundary";
 
 const DashboardPage = lazy(() => import("@/features/dashboard"));
 const PosPage = lazy(() => import("@/features/pos"));
@@ -14,6 +15,7 @@ export const appRouter = createBrowserRouter([
   {
     path: "/",
     Component: AppShell,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
