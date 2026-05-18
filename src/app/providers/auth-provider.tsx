@@ -41,7 +41,7 @@ const SESSION_STORAGE_KEY = "xyz-supermarket-session";
 const defaultAdmin: AuthAccount = {
   username: "admin",
   name: "Administrator",
-  password: "admin123",
+  password: "admin",
   role: "admin",
   profileImage: "",
 };
@@ -93,7 +93,12 @@ function readAccounts() {
 
     const normalized = parsed
       .filter((account): account is AuthAccount => Boolean(account?.username && account?.name && account?.password && account?.role))
-      .map(normalizeAccount);
+      .map(normalizeAccount)
+      .map((account) =>
+        account.username.toLowerCase() === "admin" && account.role === "admin" && account.password === "admin123"
+          ? { ...account, password: "admin" }
+          : account
+      );
 
     if (!normalized.some((account) => account.role === "admin")) {
       const withAdmin = [defaultAdmin, ...normalized];

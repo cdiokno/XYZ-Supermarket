@@ -39,18 +39,22 @@ export function AppShell() {
   const location = useLocation();
   const { loading, syncing, loadError, hasSupabaseConfig } = useStore();
   const { currentUser, loading: authLoading } = useAuth();
-  const isSettingsRoute = location.pathname === "/settings" || location.pathname.startsWith("/settings/");
+  const isLoginRoute = location.pathname === "/login" || location.pathname.startsWith("/login/");
   const navItems = getNavItems(true);
 
   if (authLoading) {
-    if (isSettingsRoute) {
+    if (isLoginRoute) {
       return <LoginShellFallback />;
     }
 
     return <AppLoadingSkeleton label="Loading account data" />;
   }
 
-  if (!currentUser && isSettingsRoute) {
+  if (currentUser && isLoginRoute) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (!currentUser && isLoginRoute) {
     return (
       <div className="min-h-screen bg-[#f2f2f7]">
         <main className="p-4 sm:p-8">
@@ -63,8 +67,8 @@ export function AppShell() {
     );
   }
 
-  if (!currentUser && !isSettingsRoute) {
-    return <Navigate to="/settings" replace />;
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
   }
 
   if (loading) {

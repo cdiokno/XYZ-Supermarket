@@ -35,7 +35,7 @@ export function RouteErrorBoundary() {
             <Button type="button" className="h-11 rounded-xl bg-[#007AFF] hover:bg-[#0051D5]" onClick={() => window.location.reload()}>
               Reload screen
             </Button>
-            <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => navigate("/settings", { replace: true })}>
+            <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={() => navigate("/login", { replace: true })}>
               Go to login
             </Button>
           </div>
