@@ -187,10 +187,12 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
-      create_cashier_account: {
+      create_app_account: {
         Args: {
+          p_admin_username: string;
           p_name: string;
           p_password: string;
+          p_role: string;
           p_username: string;
         };
         Returns: {

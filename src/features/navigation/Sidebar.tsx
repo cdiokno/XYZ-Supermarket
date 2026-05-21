@@ -1,7 +1,9 @@
 import { LayoutDashboard, ScanBarcode, Package, Truck, FileBarChart, History, Settings } from "lucide-react";
+import type { AppView } from "@/app/permissions";
 import { AppLogo } from "@/shared/brand";
+import { cn } from "@/shared/ui/utils";
 
-export type View = "dashboard" | "pos" | "inventory" | "purchase-orders" | "reports" | "history" | "settings";
+export type View = AppView;
 
 export type NavItem = { key: View; path: string; label: string; icon: typeof LayoutDashboard };
 
@@ -24,10 +26,12 @@ export function Sidebar({
   currentPath,
   onNavigate,
   navItems,
+  canAccessItem,
 }: {
   currentPath: string;
   onNavigate: (path: string) => void;
   navItems: NavItem[];
+  canAccessItem: (item: NavItem) => boolean;
 }) {
   const expanded = true;
   const width = 280;
@@ -60,17 +64,27 @@ export function Sidebar({
         <nav className={`mt-2 space-y-2 flex-1 ${expanded ? "px-3" : "px-0"}`}>
           {navItems.map((n) => {
             const active = currentPath === n.path || currentPath.startsWith(`${n.path}/`);
+            const canAccess = canAccessItem(n);
             return (
               <button
                 key={n.key}
                 type="button"
                 onClick={() => onNavigate(n.path)}
-                className={`flex items-center rounded-full ${
-                  expanded ? "w-full gap-3 px-5 h-11 justify-start" : "size-11 mx-auto justify-center"
-                } ${active ? "bg-[#08f] text-white" : "text-[#1a1a1a] hover:bg-black/5"}`}
+                disabled={!canAccess}
+                aria-disabled={!canAccess}
+                title={canAccess ? n.label : `${n.label} is not available for this role`}
+                className={cn(
+                  "flex items-center rounded-full",
+                  expanded ? "w-full gap-3 px-5 h-11 justify-start" : "size-11 mx-auto justify-center",
+                  canAccess
+                    ? active
+                      ? "bg-[#08f] text-white"
+                      : "text-[#1a1a1a] hover:bg-black/5"
+                    : "cursor-not-allowed text-[#9ca3af] opacity-60"
+                )}
                 style={{ transition: `background-color 220ms ${easing}, color 220ms ${easing}, padding 420ms ${easing}` }}
               >
-                <n.icon className="size-5 shrink-0" strokeWidth={active ? 2.4 : 2} />
+                <n.icon className="size-5 shrink-0" strokeWidth={active && canAccess ? 2.4 : 2} />
                 <span
                   className="whitespace-nowrap overflow-hidden"
                   style={{

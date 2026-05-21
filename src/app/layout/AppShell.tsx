@@ -6,6 +6,7 @@ import { AppLoadingSkeleton, DashboardSkeleton, LoginPageSkeleton } from "@/app/
 import { getNavItems, Sidebar } from "@/features/navigation/Sidebar";
 import { useStore } from "@/app/providers/store-provider";
 import { useAuth } from "@/app/providers/auth-provider";
+import { canAccessView } from "@/app/permissions";
 
 function RouteFallback() {
   return (
@@ -41,6 +42,7 @@ export function AppShell() {
   const { currentUser, loading: authLoading } = useAuth();
   const isLoginRoute = location.pathname === "/login" || location.pathname.startsWith("/login/");
   const navItems = getNavItems(true);
+  const canAccessItem = (item: (typeof navItems)[number]) => Boolean(currentUser && canAccessView(currentUser.role, item.key));
 
   if (authLoading) {
     if (isLoginRoute) {
@@ -77,7 +79,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] flex">
-      <Sidebar currentPath={location.pathname} onNavigate={navigate} navItems={navItems} />
+      <Sidebar currentPath={location.pathname} onNavigate={navigate} navItems={navItems} canAccessItem={canAccessItem} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         <main className="flex-1 p-4 pb-28 md:p-8 md:pb-8">
@@ -100,17 +102,23 @@ export function AppShell() {
           <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
             {navItems.map((item) => {
               const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+              const canAccess = canAccessItem(item);
               return (
                 <Button
                   key={item.key}
                   type="button"
                   size="icon"
                   variant="ghost"
-                  aria-label={item.label}
-                  title={item.label}
+                  aria-label={canAccess ? item.label : `${item.label} unavailable`}
+                  title={canAccess ? item.label : `${item.label} is not available for this role`}
                   onClick={() => navigate(item.path)}
+                  disabled={!canAccess}
                   className={`mx-auto h-10 w-10 rounded-full ${
-                    active ? "bg-[#007AFF] text-white hover:bg-[#0051D5]" : "text-[#1a1a1a] hover:bg-black/5"
+                    canAccess
+                      ? active
+                        ? "bg-[#007AFF] text-white hover:bg-[#0051D5]"
+                        : "text-[#1a1a1a] hover:bg-black/5"
+                      : "cursor-not-allowed text-[#9ca3af] opacity-50 hover:bg-transparent"
                   }`}
                 >
                   <item.icon className="size-5" />

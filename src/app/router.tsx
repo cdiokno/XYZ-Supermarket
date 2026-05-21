@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppShell } from "@/app/layout/AppShell";
 import { RouteErrorBoundary } from "@/app/RouteErrorBoundary";
+import { RequireViewAccess } from "@/app/RequireViewAccess";
 
 const DashboardPage = lazy(() => import("@/features/dashboard"));
 const PosPage = lazy(() => import("@/features/pos"));
@@ -24,19 +25,35 @@ export const appRouter = createBrowserRouter([
       },
       {
         path: "dashboard",
-        element: <DashboardPage />,
+        element: (
+          <RequireViewAccess view="dashboard">
+            <DashboardPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "pos",
-        element: <PosPage />,
+        element: (
+          <RequireViewAccess view="pos">
+            <PosPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "inventory",
-        element: <InventoryPage />,
+        element: (
+          <RequireViewAccess view="inventory">
+            <InventoryPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "purchase-orders",
-        element: <PurchaseOrdersPage />,
+        element: (
+          <RequireViewAccess view="purchase-orders">
+            <PurchaseOrdersPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "po",
@@ -44,11 +61,19 @@ export const appRouter = createBrowserRouter([
       },
       {
         path: "history",
-        element: <HistoryPage />,
+        element: (
+          <RequireViewAccess view="history">
+            <HistoryPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "reports",
-        element: <ReportsPage />,
+        element: (
+          <RequireViewAccess view="reports">
+            <ReportsPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "login",
@@ -56,7 +81,11 @@ export const appRouter = createBrowserRouter([
       },
       {
         path: "settings",
-        element: <SettingsPage />,
+        element: (
+          <RequireViewAccess view="settings">
+            <SettingsPage />
+          </RequireViewAccess>
+        ),
       },
       {
         path: "*",

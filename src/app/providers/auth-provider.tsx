@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createBackendCashierAccount, deleteBackendAccount, fetchBackendAccounts, loginBackendAccount, updateBackendAccount } from "@/services/auth";
+import { createBackendAccount, deleteBackendAccount, fetchBackendAccounts, loginBackendAccount, updateBackendAccount } from "@/services/auth";
 import { hasSupabaseConfig } from "@/services/supabase";
+import { getRoleSortIndex, isUserRole, type UserRole } from "@/app/roles";
 
-export type UserRole = "admin" | "cashier";
+export type { UserRole };
 
 export type AuthAccount = {
   username: string;
@@ -23,7 +24,7 @@ type AuthContextValue = {
   isAdmin: boolean;
   login: (username: string, password: string) => Promise<AuthResult>;
   logout: () => void;
-  addCashierAccount: (account: { name: string; username: string; password: string }) => Promise<AuthResult>;
+  addAccount: (account: { name: string; username: string; password: string; role: UserRole }) => Promise<AuthResult>;
   deleteAccount: (username: string) => Promise<AuthResult>;
   updateCurrentAccount: (payload: {
     name: string;
@@ -52,7 +53,7 @@ function toAuthUser(account: AuthAccount): AuthUser {
 }
 
 function sortAccounts(accounts: AuthAccount[]) {
-  return [...accounts].sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
+  return [...accounts].sort((a, b) => getRoleSortIndex(a.role) - getRoleSortIndex(b.role) || a.name.localeCompare(b.name));
 }
 
 function upsertAccount(accounts: AuthAccount[], account: AuthAccount) {
@@ -92,7 +93,10 @@ function readAccounts() {
     }
 
     const normalized = parsed
-      .filter((account): account is AuthAccount => Boolean(account?.username && account?.name && account?.password && account?.role))
+      .filter(
+        (account): account is AuthAccount =>
+          Boolean(account?.username && account?.name && account?.password && isUserRole(account?.role))
+      )
       .map(normalizeAccount)
       .map((account) =>
         account.username.toLowerCase() === "admin" && account.role === "admin" && account.password === "admin123"
@@ -221,12 +225,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSessionUsername();
   };
 
-  const addCashierAccount: AuthContextValue["addCashierAccount"] = async ({ name, username, password }) => {
+  const addAccount: AuthContextValue["addAccount"] = async ({ name, username, password, role }) => {
+    if (currentUser?.role !== "admin") {
+      return { ok: false, message: "Only administrators can create accounts." };
+    }
+
     const trimmedName = name.trim();
     const trimmedUsername = username.trim();
 
     if (!trimmedName || !trimmedUsername || !password) {
-      return { ok: false, message: "Complete all cashier account fields." };
+      return { ok: false, message: "Complete all account fields." };
+    }
+
+    if (!isUserRole(role)) {
+      return { ok: false, message: "Select a valid account role." };
     }
 
     if (accounts.some((account) => account.username.toLowerCase() === trimmedUsername.toLowerCase())) {
@@ -234,15 +246,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (accounts.some((account) => account.name.toLowerCase() === trimmedName.toLowerCase())) {
-      return { ok: false, message: "Cashier name already has an account." };
+      return { ok: false, message: "Staff name already has an account." };
     }
 
     if (hasSupabaseConfig) {
       try {
-        const createdAccount = await createBackendCashierAccount({
+        const createdAccount = await createBackendAccount({
+          adminUsername: currentUser.username,
           name: trimmedName,
           username: trimmedUsername,
           password,
+          role,
         });
 
         setAccounts((current) => upsertAccount(current, createdAccount));
@@ -258,7 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: trimmedName,
         username: trimmedUsername,
         password,
-        role: "cashier",
+        role,
         profileImage: "",
       },
     ]);
@@ -384,10 +398,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, message: "Account not found." };
     }
 
-    if (targetAccount.role !== "cashier") {
-      return { ok: false, message: "Only cashier accounts can be deleted." };
-    }
-
     if (hasSupabaseConfig) {
       try {
         await deleteBackendAccount({
@@ -416,7 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: currentUser?.role === "admin",
       login,
       logout,
-      addCashierAccount,
+      addAccount,
       deleteAccount,
       updateCurrentAccount,
     }),

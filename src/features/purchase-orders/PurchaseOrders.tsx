@@ -47,6 +47,10 @@ export function PurchaseOrders({
   onDeletePO,
   receivePO,
   undoReceivePO,
+  canCreatePO = true,
+  canDeletePO = true,
+  canReceivePO = true,
+  canUndoReceivePO = true,
 }: {
   products: Product[];
   purchaseOrders: PurchaseOrder[];
@@ -54,6 +58,10 @@ export function PurchaseOrders({
   onDeletePO: (po: PurchaseOrder) => Promise<void>;
   receivePO: (po: PurchaseOrder, receivedQty: number) => Promise<void>;
   undoReceivePO: (po: PurchaseOrder, receivedQty: number) => Promise<void>;
+  canCreatePO?: boolean;
+  canDeletePO?: boolean;
+  canReceivePO?: boolean;
+  canUndoReceivePO?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ supplier: "", productId: products[0]?.id || "", qty: 0 });
@@ -84,6 +92,11 @@ export function PurchaseOrders({
   }, [undoWindows]);
 
   const create = async () => {
+    if (!canCreatePO) {
+      toast.error("Only administrators can create purchase orders.");
+      return;
+    }
+
     const product = products.find((p) => p.id === form.productId);
     if (!product || !form.supplier.trim() || form.qty <= 0) {
       toast.error("Fill all fields");
@@ -114,6 +127,11 @@ export function PurchaseOrders({
   };
 
   const openReceiveDialog = (po: PurchaseOrder) => {
+    if (!canReceivePO) {
+      toast.error("You do not have access to receive purchase orders.");
+      return;
+    }
+
     const remainingQty = getRemainingQty(po);
     setReceivingPO(po);
     setReceiptQty(remainingQty);
@@ -121,6 +139,10 @@ export function PurchaseOrders({
 
   const receive = async () => {
     if (!receivingPO) return;
+    if (!canReceivePO) {
+      toast.error("You do not have access to receive purchase orders.");
+      return;
+    }
 
     const remainingQty = getRemainingQty(receivingPO);
     const qtyToReceive = Math.floor(Number(receiptQty));
@@ -154,6 +176,11 @@ export function PurchaseOrders({
   };
 
   const deletePO = async (po: PurchaseOrder) => {
+    if (!canDeletePO) {
+      toast.error("Only administrators can delete purchase orders.");
+      return;
+    }
+
     const inventoryNote =
       po.receivedQty > 0 ? ` The ${po.receivedQty} received units will be removed from inventory.` : "";
     const confirmed = window.confirm(`Delete purchase order #${po.id.toUpperCase()} for ${po.productName}?${inventoryNote}`);
@@ -176,6 +203,11 @@ export function PurchaseOrders({
   };
 
   const undoReceive = async (po: PurchaseOrder, qty: number) => {
+    if (!canUndoReceivePO) {
+      toast.error("Only administrators can undo received purchase orders.");
+      return;
+    }
+
     setUndoingId(po.id);
     try {
       await undoReceivePO(po, qty);
@@ -201,12 +233,12 @@ export function PurchaseOrders({
 
     return (
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {remainingQty > 0 && (
+        {canReceivePO && remainingQty > 0 && (
           <Button size="sm" variant="outline" onClick={() => openReceiveDialog(po)} disabled={busy}>
             <Check className="size-4 mr-1" /> {po.receivedQty > 0 ? "Receive more" : "Receive"}
           </Button>
         )}
-        {canUndo && undoWindow && (
+        {canUndoReceivePO && canUndo && undoWindow && (
           <Button
             size="sm"
             variant="outline"
@@ -219,17 +251,19 @@ export function PurchaseOrders({
             <span className="ml-1 text-[10px] tabular-nums text-muted-foreground">{remainingSeconds.toFixed(1)}s</span>
           </Button>
         )}
-        <Button
-          size="icon"
-          variant="ghost"
-          aria-label={`Delete purchase order #${po.id.toUpperCase()}`}
-          title={`Delete purchase order #${po.id.toUpperCase()}`}
-          className="size-8 rounded-full text-[#ff3b30] hover:bg-[#ff3b30]/10"
-          onClick={() => deletePO(po)}
-          disabled={busy}
-        >
-          <Trash2 className="size-4" />
-        </Button>
+        {canDeletePO && (
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={`Delete purchase order #${po.id.toUpperCase()}`}
+            title={`Delete purchase order #${po.id.toUpperCase()}`}
+            className="size-8 rounded-full text-[#ff3b30] hover:bg-[#ff3b30]/10"
+            onClick={() => deletePO(po)}
+            disabled={busy}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        )}
       </div>
     );
   };
@@ -242,7 +276,9 @@ export function PurchaseOrders({
         <div>
           <h2>Purchase Orders</h2>
         </div>
-        <Button onClick={() => setOpen(true)}><Plus className="size-4 mr-1" /> New PO</Button>
+        {canCreatePO && (
+          <Button onClick={() => setOpen(true)}><Plus className="size-4 mr-1" /> New PO</Button>
+        )}
       </div>
 
       {lowStock.length > 0 && (

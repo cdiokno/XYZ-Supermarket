@@ -1,12 +1,11 @@
 import { getSupabaseClient, hasSupabaseConfig } from "@/services/supabase";
 import type { Database } from "@/services/supabase/database.types";
-
-export type BackendUserRole = "admin" | "cashier";
+import type { UserRole } from "@/app/roles";
 
 export type BackendAuthAccount = {
   username: string;
   name: string;
-  role: BackendUserRole;
+  role: UserRole;
   profileImage: string;
 };
 
@@ -16,7 +15,7 @@ function mapAccount(row: AccountRow): BackendAuthAccount {
   return {
     username: row.username,
     name: row.name,
-    role: row.role as BackendUserRole,
+    role: row.role as UserRole,
     profileImage: row.profile_image || "",
   };
 }
@@ -63,11 +62,19 @@ export async function loginBackendAccount(username: string, password: string) {
   return firstAccount(data as AccountRow[] | null);
 }
 
-export async function createBackendCashierAccount(account: { name: string; username: string; password: string }) {
+export async function createBackendAccount(account: {
+  adminUsername: string;
+  name: string;
+  username: string;
+  password: string;
+  role: UserRole;
+}) {
   const client = getSupabaseClient();
-  const { data, error } = await client.rpc("create_cashier_account", {
+  const { data, error } = await client.rpc("create_app_account", {
+    p_admin_username: account.adminUsername,
     p_name: account.name,
     p_password: account.password,
+    p_role: account.role,
     p_username: account.username,
   });
 
