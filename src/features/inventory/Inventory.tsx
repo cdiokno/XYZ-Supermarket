@@ -8,21 +8,60 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Label } from "@/shared/ui/label";
 import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
-import { peso, Product } from "@/domain/store";
+import { InventoryHistoryEntry, peso, Product } from "@/domain/store";
 import { getStoreErrorMessage } from "@/services/store";
-import { Plus, Search, Pencil, ImagePlus, Check, X, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, ImagePlus, Check, X, Trash2, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const DEFAULT_CATEGORIES = ["Grocery", "Beverages", "Personal Care"];
 
+const HISTORY_ACTION_LABELS: Record<InventoryHistoryEntry["action"], string> = {
+  product_created: "Product added",
+  product_updated: "Product edited",
+  product_deleted: "Product deleted",
+  po_received: "PO received",
+  po_receipt_undone: "Receipt undone",
+  po_deleted: "PO deleted",
+};
+
+function formatHistoryValue(value: string | number | null, field: string) {
+  if (value === null || value === "") return "Blank";
+  if (field === "image") return "Photo";
+  if (field === "price" && typeof value === "number") return peso(value);
+  return String(value);
+}
+
+function formatHistoryDetails(entry: InventoryHistoryEntry) {
+  if (entry.action === "product_created") return `Created with ${entry.stockAfter} stock`;
+  if (entry.action === "product_deleted") return "Removed from active inventory";
+  if (entry.action === "po_received") return `Received from #${entry.referenceId.toUpperCase()}`;
+  if (entry.action === "po_receipt_undone") return `Undid receipt from #${entry.referenceId.toUpperCase()}`;
+  if (entry.action === "po_deleted") return `Deleted #${entry.referenceId.toUpperCase()} and removed received stock`;
+
+  if (entry.changes.length === 0) return "No field changes";
+
+  return entry.changes
+    .slice(0, 4)
+    .map((change) => `${change.label}: ${formatHistoryValue(change.before, change.field)} -> ${formatHistoryValue(change.after, change.field)}`)
+    .join("; ");
+}
+
+function formatQuantityDelta(delta: number | null) {
+  if (delta === null) return "No stock change";
+  if (delta > 0) return `+${delta}`;
+  return String(delta);
+}
+
 export function Inventory({
   products,
+  inventoryHistory,
   hasPendingOrder,
   onSaveProduct,
   onDeleteProduct,
   onUploadImage,
 }: {
   products: Product[];
+  inventoryHistory: InventoryHistoryEntry[];
   hasPendingOrder: boolean;
   onSaveProduct: (product: Product) => Promise<void>;
   onDeleteProduct: (product: Product) => Promise<void>;
@@ -35,6 +74,7 @@ export function Inventory({
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     setCategories((prev) => {
@@ -114,7 +154,16 @@ export function Inventory({
         <div>
           <h2 className="tracking-tight">Inventory</h2>
         </div>
-        <Button onClick={startAdding} className="rounded-full bg-[#007AFF] hover:bg-[#0051D5]"><Plus className="size-4 mr-1" /> Add Product</Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" onClick={() => setHistoryOpen(true)} className="rounded-full bg-white border-black/5">
+            <HistoryIcon className="size-4 mr-1" />
+            Inventory History
+            <Badge variant="secondary" className="ml-1 rounded-full">
+              {inventoryHistory.length}
+            </Badge>
+          </Button>
+          <Button onClick={startAdding} className="rounded-full bg-[#007AFF] hover:bg-[#0051D5]"><Plus className="size-4 mr-1" /> Add Product</Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -180,6 +229,114 @@ export function Inventory({
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-6xl overflow-hidden rounded-3xl p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Inventory History</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+            <Card className="rounded-none border-0 shadow-none">
+              <CardContent className="p-0">
+          <div className="flex items-center justify-between gap-3 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <HistoryIcon className="size-5 text-[#007AFF]" />
+              <h3 className="tracking-tight">Inventory History</h3>
+            </div>
+            <Badge variant="secondary" className="rounded-full">
+              {inventoryHistory.length} {inventoryHistory.length === 1 ? "entry" : "entries"}
+            </Badge>
+          </div>
+
+          <div className="hidden md:block">
+            <Table className="[&_th]:py-3 [&_td]:py-3 [&_th:first-child]:pl-6 [&_td:first-child]:pl-6 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date & Time</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead>Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {inventoryHistory.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {new Date(entry.date).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="tracking-tight">{entry.productName}</p>
+                        <p className="text-xs text-muted-foreground">{entry.sku}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="rounded-full">
+                        {entry.source === "manual" ? "Manual" : "Purchase Order"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{HISTORY_ACTION_LABELS[entry.action]}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="space-y-1">
+                        <p className={entry.quantityDelta && entry.quantityDelta < 0 ? "text-[#ff3b30]" : entry.quantityDelta && entry.quantityDelta > 0 ? "text-emerald-600" : "text-muted-foreground"}>
+                          {formatQuantityDelta(entry.quantityDelta)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {entry.stockBefore} {"->"} {entry.stockAfter}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-md text-muted-foreground">{formatHistoryDetails(entry)}</TableCell>
+                  </TableRow>
+                ))}
+                {inventoryHistory.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                      No inventory changes recorded yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-3 px-4 pb-4 md:hidden">
+            {inventoryHistory.length === 0 && (
+              <div className="rounded-2xl bg-[#f2f2f7] px-4 py-8 text-center text-muted-foreground">
+                No inventory changes recorded yet.
+              </div>
+            )}
+            {inventoryHistory.map((entry) => (
+              <div key={entry.id} className="rounded-2xl border border-black/5 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate tracking-tight">{entry.productName}</p>
+                    <p className="text-sm text-muted-foreground">{new Date(entry.date).toLocaleString()}</p>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0 rounded-full">
+                    {entry.source === "manual" ? "Manual" : "PO"}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <p>{HISTORY_ACTION_LABELS[entry.action]}</p>
+                  <p className={entry.quantityDelta && entry.quantityDelta < 0 ? "text-[#ff3b30]" : entry.quantityDelta && entry.quantityDelta > 0 ? "text-emerald-600" : "text-muted-foreground"}>
+                    {formatQuantityDelta(entry.quantityDelta)}
+                  </p>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {entry.stockBefore} {"->"} {entry.stockAfter}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{formatHistoryDetails(entry)}</p>
+              </div>
+            ))}
+          </div>
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {(editing || adding) && (
         <ProductDialog

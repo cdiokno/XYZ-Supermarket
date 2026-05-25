@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 export function POS({
   products,
+  sales,
   cashierName,
   cashierImage,
   cart,
@@ -24,6 +25,7 @@ export function POS({
   onCheckout,
 }: {
   products: Product[];
+  sales: Sale[];
   cashierName: string;
   cashierImage?: string;
   cart: SaleItem[];
@@ -33,6 +35,7 @@ export function POS({
   onCheckout: (sale: Sale) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
+  const [productFilter, setProductFilter] = useState("all");
   const [processing, setProcessing] = useState(false);
   const [mobileOrderOpen, setMobileOrderOpen] = useState(false);
 
@@ -61,9 +64,72 @@ export function POS({
     };
   }, [mobileOrderOpen]);
 
-  const filtered = useMemo(
-    () => products.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || p.sku.toLowerCase().includes(query.toLowerCase())),
-    [products, query]
+  const categories = useMemo(() => Array.from(new Set(products.map((product) => product.category))).sort(), [products]);
+
+  useEffect(() => {
+    if (!productFilter.startsWith("category:")) return;
+    const selectedCategory = productFilter.slice("category:".length);
+    if (!categories.includes(selectedCategory)) setProductFilter("all");
+  }, [categories, productFilter]);
+
+  const bestSellerCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const sale of sales) {
+      for (const item of sale.items) {
+        counts.set(item.productId, (counts.get(item.productId) || 0) + item.qty);
+      }
+    }
+    return counts;
+  }, [sales]);
+
+  const recentPurchaseDates = useMemo(() => {
+    const dates = new Map<string, number>();
+    for (const sale of sales) {
+      const soldAt = new Date(sale.date).getTime();
+      for (const item of sale.items) {
+        dates.set(item.productId, Math.max(dates.get(item.productId) || 0, soldAt));
+      }
+    }
+    return dates;
+  }, [sales]);
+
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const selectedCategory = productFilter.startsWith("category:") ? productFilter.slice("category:".length) : "";
+
+    const matches = products.filter(
+      (p) =>
+        (!selectedCategory || p.category === selectedCategory) &&
+        (!normalizedQuery || p.name.toLowerCase().includes(normalizedQuery) || p.sku.toLowerCase().includes(normalizedQuery))
+    );
+
+    if (productFilter === "best-sellers") {
+      return matches.sort(
+        (a, b) =>
+          (bestSellerCounts.get(b.id) || 0) - (bestSellerCounts.get(a.id) || 0) ||
+          a.name.localeCompare(b.name)
+      );
+    }
+
+    if (productFilter === "recently-bought") {
+      return matches.sort(
+        (a, b) =>
+          (recentPurchaseDates.get(b.id) || 0) - (recentPurchaseDates.get(a.id) || 0) ||
+          a.name.localeCompare(b.name)
+      );
+    }
+
+    return matches;
+  }, [bestSellerCounts, productFilter, products, query, recentPurchaseDates]);
+
+  const productFilterOptions = useMemo(
+    () => [
+      { value: "all", label: "All" },
+      { value: "best-sellers", label: "Best Sellers" },
+      { value: "recently-bought", label: "Recently Bought" },
+      ...categories.map((category) => ({ value: `category:${category}`, label: category })),
+    ],
+    [categories]
   );
 
   const addToCart = (p: Product) => {
@@ -168,7 +234,7 @@ export function POS({
         <h2 className="tracking-tight">Point of Sale</h2>
       </div>
 
-      <Card className="hidden lg:flex lg:col-start-4 lg:col-span-2 lg:row-start-1 lg:row-span-3 lg:self-start lg:-mt-5 h-fit sticky top-2 z-20 lg:top-3 rounded-3xl border-black/5 shadow-sm lg:h-[calc(100dvh-1.5rem)] lg:flex-col">
+      <Card className="hidden lg:flex lg:col-start-4 lg:col-span-2 lg:row-start-1 lg:row-span-4 lg:self-start lg:-mt-5 h-fit sticky top-2 z-20 lg:top-3 rounded-3xl border-black/5 shadow-sm lg:h-[calc(100dvh-1.5rem)] lg:flex-col">
         <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="flex items-center gap-2 tracking-tight">
             <Receipt className="size-5 text-[#007AFF]" /> Current Order
@@ -414,7 +480,29 @@ export function POS({
         />
       </div>
 
-      <div className="lg:col-start-1 lg:col-span-3 lg:row-start-3 grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="scrollbar-none lg:col-start-1 lg:col-span-3 lg:row-start-3 -mx-1 overflow-x-auto px-1 pb-1">
+        <div className="flex w-max min-w-full gap-2">
+          {productFilterOptions.map((option) => {
+            const active = productFilter === option.value;
+            return (
+              <Button
+                key={option.value}
+                type="button"
+                variant="outline"
+                onClick={() => setProductFilter(option.value)}
+                className={cn(
+                  "h-10 rounded-full border-black/5 px-4",
+                  active ? "bg-[#007AFF] text-white hover:bg-[#0051D5] hover:text-white" : "bg-white text-[#1a1a1a] hover:bg-black/5"
+                )}
+              >
+                {option.label}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="lg:col-start-1 lg:col-span-3 lg:row-start-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
         {filtered.map((p) => (
           <button
             key={p.id}
@@ -438,11 +526,19 @@ export function POS({
                   <Plus className="size-4" strokeWidth={2.5} />
                 </span>
               </div>
-              {p.stock <= p.reorderLevel && (
-                <Badge variant="secondary" className="mt-2 rounded-full bg-orange-50 text-orange-600">
-                  {p.stock} left
-                </Badge>
-              )}
+              <Badge
+                variant="secondary"
+                className={cn(
+                  "mt-2 rounded-full",
+                  p.stock <= 0
+                    ? "bg-[#ff3b30]/10 text-[#ff3b30]"
+                    : p.stock <= p.reorderLevel
+                      ? "bg-orange-50 text-orange-600"
+                      : "bg-emerald-50 text-emerald-700"
+                )}
+              >
+                {p.stock} in stock
+              </Badge>
             </div>
           </button>
         ))}

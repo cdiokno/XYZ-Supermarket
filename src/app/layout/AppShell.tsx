@@ -43,6 +43,7 @@ export function AppShell() {
   const isLoginRoute = location.pathname === "/login" || location.pathname.startsWith("/login/");
   const navItems = getNavItems(true);
   const canAccessItem = (item: (typeof navItems)[number]) => Boolean(currentUser && canAccessView(currentUser.role, item.key));
+  const visibleNavItems = navItems.filter(canAccessItem);
 
   if (authLoading) {
     if (isLoginRoute) {
@@ -79,7 +80,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-[#f2f2f7] flex">
-      <Sidebar currentPath={location.pathname} onNavigate={navigate} navItems={navItems} canAccessItem={canAccessItem} />
+      <Sidebar currentPath={location.pathname} onNavigate={navigate} navItems={visibleNavItems} canAccessItem={canAccessItem} />
 
       <div className="flex-1 min-w-0 flex flex-col">
         <main className="flex-1 p-4 pb-28 md:p-8 md:pb-8">
@@ -99,8 +100,8 @@ export function AppShell() {
         </main>
 
         <nav className="md:hidden fixed left-1/2 -translate-x-1/2 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-30 w-[calc(100%-1.5rem)] max-w-md rounded-full border border-black/10 bg-white/90 backdrop-blur-2xl shadow-[0_12px_30px_rgba(0,0,0,0.12)] px-2 py-1.5">
-          <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
-            {navItems.map((item) => {
+          <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${visibleNavItems.length}, minmax(0, 1fr))` }}>
+            {visibleNavItems.map((item) => {
               const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
               const canAccess = canAccessItem(item);
               return (

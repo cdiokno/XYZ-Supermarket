@@ -9,6 +9,39 @@ export type Product = {
   image?: string;
 };
 
+export type InventoryHistorySource = "manual" | "purchase_order";
+
+export type InventoryHistoryAction =
+  | "product_created"
+  | "product_updated"
+  | "product_deleted"
+  | "po_received"
+  | "po_receipt_undone"
+  | "po_deleted";
+
+export type InventoryHistoryChange = {
+  field: string;
+  label: string;
+  before: string | number | null;
+  after: string | number | null;
+};
+
+export type InventoryHistoryEntry = {
+  id: string;
+  date: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  source: InventoryHistorySource;
+  action: InventoryHistoryAction;
+  quantityDelta: number | null;
+  stockBefore: number;
+  stockAfter: number;
+  changes: InventoryHistoryChange[];
+  referenceType: "product" | "purchase_order";
+  referenceId: string;
+};
+
 export const productImages: Record<string, string> = {
   p1: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400",
   p2: "https://images.unsplash.com/photo-1610725664285-7c57e6eeac3f?w=400",
@@ -33,6 +66,66 @@ export type Sale = {
   items: SaleItem[];
   total: number;
 };
+
+export type ReceiptReturnType = "cash_refund" | "replacement" | "store_credit";
+
+export type ReceiptReturnLineInput = {
+  productId: string;
+  qty: number;
+};
+
+export type ReceiptReturnRequest = {
+  id?: string;
+  saleId: string;
+  date?: string;
+  cashier: string;
+  type: ReceiptReturnType;
+  returnedItems: ReceiptReturnLineInput[];
+  replacementItems?: ReceiptReturnLineInput[];
+};
+
+export type ReceiptReturn = {
+  id: string;
+  saleId: string;
+  date: string;
+  cashier: string;
+  type: ReceiptReturnType;
+  returnedItems: SaleItem[];
+  replacementItems: SaleItem[];
+  returnedValue: number;
+  replacementValue: number;
+  refundAmount: number;
+  additionalDue: number;
+  storeCreditAmount: number;
+};
+
+export const receiptReturnTypeLabels: Record<ReceiptReturnType, string> = {
+  cash_refund: "Cash refund",
+  replacement: "Replacement",
+  store_credit: "Store credit",
+};
+
+export function getReceiptReturnRevenueAdjustment(receiptReturn: ReceiptReturn) {
+  return receiptReturn.additionalDue - receiptReturn.refundAmount - receiptReturn.storeCreditAmount;
+}
+
+export function getSaleNetTotal(sale: Sale, receiptReturns: ReceiptReturn[]) {
+  return receiptReturns
+    .filter((receiptReturn) => receiptReturn.saleId === sale.id)
+    .reduce((total, receiptReturn) => total + getReceiptReturnRevenueAdjustment(receiptReturn), sale.total);
+}
+
+export function getSaleNetQty(sale: Sale, receiptReturns: ReceiptReturn[]) {
+  return receiptReturns
+    .filter((receiptReturn) => receiptReturn.saleId === sale.id)
+    .reduce(
+      (total, receiptReturn) =>
+        total -
+        receiptReturn.returnedItems.reduce((sum, item) => sum + item.qty, 0) +
+        receiptReturn.replacementItems.reduce((sum, item) => sum + item.qty, 0),
+      sale.items.reduce((sum, item) => sum + item.qty, 0)
+    );
+}
 
 export type PurchaseOrderStatus = "Pending" | "Partially Received" | "Received";
 

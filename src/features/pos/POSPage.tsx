@@ -3,7 +3,7 @@ import { useAuth } from "@/app/providers/auth-provider";
 import { POS } from "./POS";
 
 export default function POSPage() {
-  const { products, checkout, posCart, setPosCart, posTendered, setPosTendered } = useStore();
+  const { products, sales, checkout, posCart, setPosCart, posTendered, setPosTendered } = useStore();
   const { currentUser } = useAuth();
   const cashierName = currentUser?.name || "Cashier";
   const cashierImage = currentUser?.profileImage || "";
@@ -11,6 +11,7 @@ export default function POSPage() {
   return (
     <POS
       products={products}
+      sales={sales}
       cashierName={cashierName}
       cashierImage={cashierImage}
       cart={posCart}

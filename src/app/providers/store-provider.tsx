@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import type { Product, PurchaseOrder, Sale, SaleItem } from "@/domain/store";
+import type { InventoryHistoryEntry, Product, PurchaseOrder, ReceiptReturn, ReceiptReturnRequest, Sale, SaleItem } from "@/domain/store";
 import {
   addCashier,
   checkoutSale,
@@ -9,6 +9,7 @@ import {
   deleteSale,
   fetchStoreData,
   getStoreErrorMessage,
+  processReceiptReturn,
   receivePurchaseOrder,
   saveProduct,
   undoReceivePurchaseOrder,
@@ -21,6 +22,8 @@ type StoreContextValue = {
   products: Product[];
   sales: Sale[];
   purchaseOrders: PurchaseOrder[];
+  inventoryHistory: InventoryHistoryEntry[];
+  receiptReturns: ReceiptReturn[];
   cashiers: string[];
   loading: boolean;
   syncing: boolean;
@@ -37,6 +40,7 @@ type StoreContextValue = {
   createPurchaseOrder: (purchaseOrder: PurchaseOrder) => Promise<void>;
   deletePurchaseOrder: (purchaseOrder: PurchaseOrder) => Promise<void>;
   deleteSale: (sale: Sale) => Promise<void>;
+  processReceiptReturn: (request: ReceiptReturnRequest) => Promise<void>;
   receivePurchaseOrder: (purchaseOrder: PurchaseOrder, receivedQty: number) => Promise<void>;
   undoReceivePurchaseOrder: (purchaseOrder: PurchaseOrder, receivedQty: number) => Promise<void>;
   uploadProductImage: (file: File, productId: string) => Promise<string>;
@@ -82,6 +86,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [inventoryHistory, setInventoryHistory] = useState<InventoryHistoryEntry[]>([]);
+  const [receiptReturns, setReceiptReturns] = useState<ReceiptReturn[]>([]);
   const [cashiers, setCashiers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -102,6 +108,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProducts(data.products);
       setSales(data.sales);
       setPurchaseOrders(data.purchaseOrders);
+      setInventoryHistory(data.inventoryHistory);
+      setReceiptReturns(data.receiptReturns);
       setCashiers(data.cashiers);
     } catch (error) {
       const message = getStoreErrorMessage(error);
@@ -153,13 +161,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const exists = current.some((item) => item.id === saved.id);
       return exists ? current.map((item) => (item.id === saved.id ? saved : item)) : [...current, saved];
     });
-  }, []);
+    await loadStore();
+  }, [loadStore]);
 
   const handleDeleteProduct = useCallback(
     async (product: Product) => {
       await deleteProduct(product.id);
       setProducts((current) => current.filter((item) => item.id !== product.id));
-      void loadStore();
+      await loadStore();
     },
     [loadStore]
   );
@@ -189,7 +198,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      void loadStore();
+      await loadStore();
     },
     [loadStore]
   );
@@ -204,7 +213,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return soldItem ? { ...product, stock: product.stock + soldItem.qty } : product;
         })
       );
-      void loadStore();
+      await loadStore();
+    },
+    [loadStore]
+  );
+
+  const handleProcessReceiptReturn = useCallback(
+    async (request: ReceiptReturnRequest) => {
+      await processReceiptReturn(request);
+      await loadStore();
     },
     [loadStore]
   );
@@ -218,7 +235,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProducts((current) =>
         current.map((product) => (product.id === purchaseOrder.productId ? { ...product, stock: product.stock + receivedQty } : product))
       );
-      void loadStore();
+      await loadStore();
     },
     [loadStore]
   );
@@ -234,7 +251,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           product.id === purchaseOrder.productId ? { ...product, stock: Math.max(0, product.stock - receivedQty) } : product
         )
       );
-      void loadStore();
+      await loadStore();
     },
     [loadStore]
   );
@@ -244,6 +261,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       products,
       sales,
       purchaseOrders,
+      inventoryHistory,
+      receiptReturns,
       cashiers,
       loading,
       syncing,
@@ -260,6 +279,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       createPurchaseOrder: handleCreatePurchaseOrder,
       deletePurchaseOrder: handleDeletePurchaseOrder,
       deleteSale: handleDeleteSale,
+      processReceiptReturn: handleProcessReceiptReturn,
       receivePurchaseOrder: handleReceivePurchaseOrder,
       undoReceivePurchaseOrder: handleUndoReceivePurchaseOrder,
       uploadProductImage,
@@ -268,6 +288,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       products,
       sales,
       purchaseOrders,
+      inventoryHistory,
+      receiptReturns,
       cashiers,
       loading,
       syncing,
@@ -281,6 +303,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       handleCreatePurchaseOrder,
       handleDeletePurchaseOrder,
       handleDeleteSale,
+      handleProcessReceiptReturn,
       handleReceivePurchaseOrder,
       handleUndoReceivePurchaseOrder,
     ]

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { ImageWithFallback } from "@/shared/components/ImageWithFallback";
-import { peso, Product, PurchaseOrder, Sale } from "@/domain/store";
+import { getReceiptReturnRevenueAdjustment, getSaleNetTotal, peso, Product, PurchaseOrder, ReceiptReturn, Sale } from "@/domain/store";
 import { AlertTriangle, Banknote, Boxes, ReceiptText, ShoppingCart, TrendingUp, Truck } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -19,18 +19,31 @@ export function Dashboard({
   products,
   sales,
   purchaseOrders,
+  receiptReturns,
   userName,
 }: {
   products: Product[];
   sales: Sale[];
   purchaseOrders: PurchaseOrder[];
+  receiptReturns: ReceiptReturn[];
   userName: string;
 }) {
   const today = new Date().toDateString();
   const productById = new Map(products.map((product) => [product.id, product]));
   const todaySales = sales.filter((sale) => new Date(sale.date).toDateString() === today);
-  const todayRevenue = todaySales.reduce((total, sale) => total + sale.total, 0);
-  const todayUnits = todaySales.reduce((total, sale) => total + sale.items.reduce((sum, item) => sum + item.qty, 0), 0);
+  const todayReturns = receiptReturns.filter((receiptReturn) => new Date(receiptReturn.date).toDateString() === today);
+  const todayRevenue =
+    todaySales.reduce((total, sale) => total + sale.total, 0) +
+    todayReturns.reduce((total, receiptReturn) => total + getReceiptReturnRevenueAdjustment(receiptReturn), 0);
+  const todayUnits =
+    todaySales.reduce((total, sale) => total + sale.items.reduce((sum, item) => sum + item.qty, 0), 0) +
+    todayReturns.reduce(
+      (total, receiptReturn) =>
+        total -
+        receiptReturn.returnedItems.reduce((sum, item) => sum + item.qty, 0) +
+        receiptReturn.replacementItems.reduce((sum, item) => sum + item.qty, 0),
+      0
+    );
   const lowStock = products.filter((product) => product.stock <= product.reorderLevel).sort((a, b) => a.stock - b.stock);
   const totalStock = products.reduce((total, product) => total + product.stock, 0);
   const inventoryValue = products.reduce((total, product) => total + product.stock * product.price, 0);
@@ -42,35 +55,53 @@ export function Dashboard({
     const date = new Date();
     date.setDate(date.getDate() - (6 - index));
     const key = date.toDateString();
-    const total = sales.filter((sale) => new Date(sale.date).toDateString() === key).reduce((sum, sale) => sum + sale.total, 0);
+    const salesTotal = sales.filter((sale) => new Date(sale.date).toDateString() === key).reduce((sum, sale) => sum + sale.total, 0);
+    const returnsTotal = receiptReturns
+      .filter((receiptReturn) => new Date(receiptReturn.date).toDateString() === key)
+      .reduce((sum, receiptReturn) => sum + getReceiptReturnRevenueAdjustment(receiptReturn), 0);
+    const total = salesTotal + returnsTotal;
     return { day: date.toLocaleDateString("en-US", { weekday: "short" }), total };
   });
 
   const performanceByProduct = new Map<string, ProductPerformance>();
   const categoryRevenue = new Map<string, number>();
 
+  const applyProductPerformance = (item: { productId: string; name: string; price: number; qty: number }, direction: 1 | -1) => {
+    const product = productById.get(item.productId);
+    const category = product?.category || "Uncategorized";
+    const current = performanceByProduct.get(item.productId) || {
+      productId: item.productId,
+      name: item.name,
+      sku: product?.sku || item.productId,
+      category,
+      image: product?.image,
+      qty: 0,
+      revenue: 0,
+    };
+
+    current.qty += item.qty * direction;
+    current.revenue += item.qty * item.price * direction;
+    performanceByProduct.set(item.productId, current);
+    categoryRevenue.set(category, (categoryRevenue.get(category) || 0) + item.qty * item.price * direction);
+  };
+
   for (const sale of sales) {
     for (const item of sale.items) {
-      const product = productById.get(item.productId);
-      const category = product?.category || "Uncategorized";
-      const current = performanceByProduct.get(item.productId) || {
-        productId: item.productId,
-        name: item.name,
-        sku: product?.sku || item.productId,
-        category,
-        image: product?.image,
-        qty: 0,
-        revenue: 0,
-      };
+      applyProductPerformance(item, 1);
+    }
+  }
 
-      current.qty += item.qty;
-      current.revenue += item.qty * item.price;
-      performanceByProduct.set(item.productId, current);
-      categoryRevenue.set(category, (categoryRevenue.get(category) || 0) + item.qty * item.price);
+  for (const receiptReturn of receiptReturns) {
+    for (const item of receiptReturn.returnedItems) {
+      applyProductPerformance(item, -1);
+    }
+    for (const item of receiptReturn.replacementItems) {
+      applyProductPerformance(item, 1);
     }
   }
 
   const topProducts = Array.from(performanceByProduct.values())
+    .filter((product) => product.qty > 0 || product.revenue > 0)
     .sort((a, b) => b.qty - a.qty || b.revenue - a.revenue)
     .slice(0, 5);
   const topProductQty = Math.max(1, ...topProducts.map((product) => product.qty));
@@ -78,7 +109,7 @@ export function Dashboard({
   const categoryRows = Array.from(categoryRevenue.entries())
     .map(([category, revenue]) => ({ category, revenue }))
     .sort((a, b) => b.revenue - a.revenue);
-  const topCategoryRevenue = Math.max(1, ...categoryRows.map((row) => row.revenue));
+  const topCategoryRevenue = Math.max(1, ...categoryRows.map((row) => Math.max(row.revenue, 0)));
   const categoryColors = ["bg-[#007AFF]", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-slate-500"];
 
   const recentSales = [...sales].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
@@ -173,7 +204,7 @@ export function Dashboard({
                 <div className="h-2 overflow-hidden rounded-full bg-[#f2f2f7]">
                   <div
                     className={`h-full rounded-full ${categoryColors[index % categoryColors.length]}`}
-                    style={{ width: `${(row.revenue / topCategoryRevenue) * 100}%` }}
+                    style={{ width: `${(Math.max(row.revenue, 0) / topCategoryRevenue) * 100}%` }}
                   />
                 </div>
               </div>
@@ -235,10 +266,10 @@ export function Dashboard({
             <div key={sale.id} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
               <div className="min-w-0">
                 <p className="truncate">{sale.items.map((item) => item.name).join(", ")}</p>
-                <p className="truncate text-sm text-muted-foreground">{sale.cashier} - {new Date(sale.date).toLocaleString()}</p>
+              <p className="truncate text-sm text-muted-foreground">{sale.cashier} - {new Date(sale.date).toLocaleString()}</p>
               </div>
               <Badge variant="secondary">{sale.items.reduce((total, item) => total + item.qty, 0)} items</Badge>
-              <p className="text-right">{peso(sale.total)}</p>
+              <p className="text-right">{peso(getSaleNetTotal(sale, receiptReturns))}</p>
             </div>
           ))}
         </CardContent>

@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/shared/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 import { Button } from "@/shared/ui/button";
-import { Product, Sale, peso } from "@/domain/store";
+import { getReceiptReturnRevenueAdjustment, Product, ReceiptReturn, Sale, peso } from "@/domain/store";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 
-export function Reports({ sales, products }: { sales: Sale[]; products: Product[] }) {
+export function Reports({ sales, products, receiptReturns }: { sales: Sale[]; products: Product[]; receiptReturns: ReceiptReturn[] }) {
   const [range, setRange] = useState<"daily" | "weekly" | "monthly">("daily");
   const [exporting, setExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -22,20 +22,53 @@ export function Reports({ sales, products }: { sales: Sale[]; products: Product[
     return sales.filter((s) => new Date(s.date) >= cutoff);
   }, [sales, range]);
 
-  const revenue = filtered.reduce((a, s) => a + s.total, 0);
-  const itemsSold = filtered.reduce((a, s) => a + s.items.reduce((x, i) => x + i.qty, 0), 0);
+  const filteredReturns = useMemo(() => {
+    const now = new Date();
+    const days = range === "daily" ? 1 : range === "weekly" ? 7 : 30;
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - days + 1);
+    cutoff.setHours(0, 0, 0, 0);
+    return receiptReturns.filter((receiptReturn) => new Date(receiptReturn.date) >= cutoff);
+  }, [receiptReturns, range]);
+
+  const revenue =
+    filtered.reduce((a, s) => a + s.total, 0) +
+    filteredReturns.reduce((a, receiptReturn) => a + getReceiptReturnRevenueAdjustment(receiptReturn), 0);
+  const itemsSold =
+    filtered.reduce((a, s) => a + s.items.reduce((x, i) => x + i.qty, 0), 0) +
+    filteredReturns.reduce(
+      (total, receiptReturn) =>
+        total -
+        receiptReturn.returnedItems.reduce((sum, item) => sum + item.qty, 0) +
+        receiptReturn.replacementItems.reduce((sum, item) => sum + item.qty, 0),
+      0
+    );
 
   const productSales = useMemo(() => {
     const map = new Map<string, { name: string; qty: number; revenue: number }>();
+    const applyItem = (item: { productId: string; name: string; price: number; qty: number }, direction: 1 | -1) => {
+      const cur = map.get(item.productId) || { name: item.name, qty: 0, revenue: 0 };
+      cur.qty += item.qty * direction;
+      cur.revenue += item.qty * item.price * direction;
+      map.set(item.productId, cur);
+    };
+
     for (const s of filtered)
       for (const i of s.items) {
-        const cur = map.get(i.productId) || { name: i.name, qty: 0, revenue: 0 };
-        cur.qty += i.qty;
-        cur.revenue += i.qty * i.price;
-        map.set(i.productId, cur);
+        applyItem(i, 1);
       }
-    return [...map.values()].sort((a, b) => b.revenue - a.revenue);
-  }, [filtered]);
+
+    for (const receiptReturn of filteredReturns) {
+      for (const item of receiptReturn.returnedItems) {
+        applyItem(item, -1);
+      }
+      for (const item of receiptReturn.replacementItems) {
+        applyItem(item, 1);
+      }
+    }
+
+    return [...map.values()].filter((entry) => entry.qty > 0 || entry.revenue > 0).sort((a, b) => b.revenue - a.revenue);
+  }, [filtered, filteredReturns]);
 
   const trend = useMemo(() => {
     const days = range === "daily" ? 1 : range === "weekly" ? 7 : 30;
@@ -43,10 +76,14 @@ export function Reports({ sales, products }: { sales: Sale[]; products: Product[
       const d = new Date();
       d.setDate(d.getDate() - (days - 1 - i));
       const key = d.toDateString();
-      const total = sales.filter((s) => new Date(s.date).toDateString() === key).reduce((a, s) => a + s.total, 0);
+      const salesTotal = sales.filter((s) => new Date(s.date).toDateString() === key).reduce((a, s) => a + s.total, 0);
+      const returnsTotal = receiptReturns
+        .filter((receiptReturn) => new Date(receiptReturn.date).toDateString() === key)
+        .reduce((a, receiptReturn) => a + getReceiptReturnRevenueAdjustment(receiptReturn), 0);
+      const total = salesTotal + returnsTotal;
       return { date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), total };
     });
-  }, [sales, range]);
+  }, [sales, receiptReturns, range]);
 
   const inventoryValue = products.reduce((a, p) => a + p.price * p.stock, 0);
 

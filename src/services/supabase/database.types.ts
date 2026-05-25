@@ -24,6 +24,75 @@ export type Database = {
         };
         Relationships: [];
       };
+      inventory_history: {
+        Row: {
+          action:
+            | "product_created"
+            | "product_updated"
+            | "product_deleted"
+            | "po_received"
+            | "po_receipt_undone"
+            | "po_deleted";
+          changes: Json;
+          created_at: string;
+          date: string;
+          id: string;
+          product_id: string;
+          product_name: string;
+          quantity_delta: number | null;
+          reference_id: string;
+          reference_type: "product" | "purchase_order";
+          sku: string;
+          source: "manual" | "purchase_order";
+          stock_after: number;
+          stock_before: number;
+        };
+        Insert: {
+          action:
+            | "product_created"
+            | "product_updated"
+            | "product_deleted"
+            | "po_received"
+            | "po_receipt_undone"
+            | "po_deleted";
+          changes?: Json;
+          created_at?: string;
+          date?: string;
+          id?: string;
+          product_id: string;
+          product_name: string;
+          quantity_delta?: number | null;
+          reference_id: string;
+          reference_type: "product" | "purchase_order";
+          sku: string;
+          source: "manual" | "purchase_order";
+          stock_after: number;
+          stock_before: number;
+        };
+        Update: {
+          action?:
+            | "product_created"
+            | "product_updated"
+            | "product_deleted"
+            | "po_received"
+            | "po_receipt_undone"
+            | "po_deleted";
+          changes?: Json;
+          created_at?: string;
+          date?: string;
+          id?: string;
+          product_id?: string;
+          product_name?: string;
+          quantity_delta?: number | null;
+          reference_id?: string;
+          reference_type?: "product" | "purchase_order";
+          sku?: string;
+          source?: "manual" | "purchase_order";
+          stock_after?: number;
+          stock_before?: number;
+        };
+        Relationships: [];
+      };
       products: {
         Row: {
           category: string;
@@ -109,6 +178,69 @@ export type Database = {
             columns: ["product_id"];
             isOneToOne: false;
             referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      receipt_returns: {
+        Row: {
+          additional_due: number;
+          cashier: string;
+          created_at: string;
+          date: string;
+          id: string;
+          refund_amount: number;
+          replacement_items: Json;
+          replacement_value: number;
+          returned_items: Json;
+          returned_value: number;
+          sale_id: string;
+          store_credit_amount: number;
+          type: "cash_refund" | "replacement" | "store_credit";
+        };
+        Insert: {
+          additional_due?: number;
+          cashier: string;
+          created_at?: string;
+          date?: string;
+          id?: string;
+          refund_amount?: number;
+          replacement_items?: Json;
+          replacement_value?: number;
+          returned_items?: Json;
+          returned_value?: number;
+          sale_id: string;
+          store_credit_amount?: number;
+          type: "cash_refund" | "replacement" | "store_credit";
+        };
+        Update: {
+          additional_due?: number;
+          cashier?: string;
+          created_at?: string;
+          date?: string;
+          id?: string;
+          refund_amount?: number;
+          replacement_items?: Json;
+          replacement_value?: number;
+          returned_items?: Json;
+          returned_value?: number;
+          sale_id?: string;
+          store_credit_amount?: number;
+          type?: "cash_refund" | "replacement" | "store_credit";
+        };
+        Relationships: [
+          {
+            foreignKeyName: "receipt_returns_cashier_fkey";
+            columns: ["cashier"];
+            isOneToOne: false;
+            referencedRelation: "cashiers";
+            referencedColumns: ["name"];
+          },
+          {
+            foreignKeyName: "receipt_returns_sale_id_fkey";
+            columns: ["sale_id"];
+            isOneToOne: false;
+            referencedRelation: "sales";
             referencedColumns: ["id"];
           },
         ];
@@ -229,6 +361,18 @@ export type Database = {
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
       };
+      process_receipt_return: {
+        Args: {
+          p_cashier: string;
+          p_date?: string;
+          p_replacement_items?: Json;
+          p_return_id: string;
+          p_returned_items: Json;
+          p_sale_id: string;
+          p_type: "cash_refund" | "replacement" | "store_credit";
+        };
+        Returns: Database["public"]["Tables"]["receipt_returns"]["Row"];
+      };
       delete_app_account: {
         Args: {
           p_admin_username: string;
@@ -275,6 +419,19 @@ export type Database = {
           p_received_qty?: number | null;
         };
         Returns: Database["public"]["Tables"]["purchase_orders"]["Row"];
+      };
+      upsert_product_with_history: {
+        Args: {
+          p_category: string;
+          p_image?: string | null;
+          p_name: string;
+          p_price: number;
+          p_product_id: string;
+          p_reorder_level: number;
+          p_sku: string;
+          p_stock: number;
+        };
+        Returns: Database["public"]["Tables"]["products"]["Row"];
       };
       update_app_account: {
         Args: {
