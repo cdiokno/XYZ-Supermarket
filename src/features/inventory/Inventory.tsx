@@ -231,17 +231,17 @@ export function Inventory({
       </Card>
 
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-6xl overflow-hidden rounded-3xl p-0">
+        <DialogContent className="h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] !w-[calc(100vw-2rem)] !max-w-[96rem] sm:!max-w-[96rem] overflow-hidden rounded-3xl p-0">
           <DialogHeader className="sr-only">
             <DialogTitle>Inventory History</DialogTitle>
           </DialogHeader>
-          <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <div className="h-full overflow-y-auto">
             <Card className="rounded-none border-0 shadow-none">
               <CardContent className="p-0">
-          <div className="flex items-center justify-between gap-3 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 px-8 py-6">
             <div className="flex items-center gap-2">
-              <HistoryIcon className="size-5 text-[#007AFF]" />
-              <h3 className="tracking-tight">Inventory History</h3>
+              <HistoryIcon className="size-6 text-[#007AFF]" />
+              <h3 className="text-2xl tracking-tight">Inventory History</h3>
             </div>
             <Badge variant="secondary" className="rounded-full">
               {inventoryHistory.length} {inventoryHistory.length === 1 ? "entry" : "entries"}
@@ -249,7 +249,7 @@ export function Inventory({
           </div>
 
           <div className="hidden md:block">
-            <Table className="[&_th]:py-3 [&_td]:py-3 [&_th:first-child]:pl-6 [&_td:first-child]:pl-6 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
+            <Table className="text-base [&_th]:py-4 [&_td]:py-4 [&_th:first-child]:pl-8 [&_td:first-child]:pl-8 [&_th:last-child]:pr-8 [&_td:last-child]:pr-8">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date & Time</TableHead>
@@ -269,7 +269,7 @@ export function Inventory({
                     <TableCell>
                       <div>
                         <p className="tracking-tight">{entry.productName}</p>
-                        <p className="text-xs text-muted-foreground">{entry.sku}</p>
+                        <p className="text-sm text-muted-foreground">{entry.sku}</p>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -283,12 +283,12 @@ export function Inventory({
                         <p className={entry.quantityDelta && entry.quantityDelta < 0 ? "text-[#ff3b30]" : entry.quantityDelta && entry.quantityDelta > 0 ? "text-emerald-600" : "text-muted-foreground"}>
                           {formatQuantityDelta(entry.quantityDelta)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           {entry.stockBefore} {"->"} {entry.stockAfter}
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-md text-muted-foreground">{formatHistoryDetails(entry)}</TableCell>
+                    <TableCell className="max-w-3xl whitespace-normal text-muted-foreground">{formatHistoryDetails(entry)}</TableCell>
                   </TableRow>
                 ))}
                 {inventoryHistory.length === 0 && (
@@ -302,14 +302,14 @@ export function Inventory({
             </Table>
           </div>
 
-          <div className="space-y-3 px-4 pb-4 md:hidden">
+          <div className="space-y-3 px-5 pb-5 md:hidden">
             {inventoryHistory.length === 0 && (
               <div className="rounded-2xl bg-[#f2f2f7] px-4 py-8 text-center text-muted-foreground">
                 No inventory changes recorded yet.
               </div>
             )}
             {inventoryHistory.map((entry) => (
-              <div key={entry.id} className="rounded-2xl border border-black/5 p-4">
+              <div key={entry.id} className="rounded-2xl border border-black/5 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate tracking-tight">{entry.productName}</p>
